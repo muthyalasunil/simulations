@@ -44,6 +44,7 @@ def run_simuations(simulations, iterations, threshold, value_list):
 
 
 if __name__ == '__main__':
+
     print('Hello...')
     data_df = load_data('sp500.csv')
     data_df.rename(columns=lambda x: x.strip(), inplace=True)
