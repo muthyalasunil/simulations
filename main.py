@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 from numpy import random
+from hurst import compute_Hc
 
 # Game 1
 simulations = 10000  # number of Monte Carlo Simulations
@@ -21,7 +22,7 @@ def load_data(filename):
 
 def run_simuations(simulations, iterations, threshold, value_list):
     # outer loop is Monte Carlo sims and inner loop is games played
-    print(simulations, iterations, threshold)
+    # print(simulations, iterations, threshold)
     index_value = []
     for g in range(iterations):
         sim_results = []
@@ -35,6 +36,9 @@ def run_simuations(simulations, iterations, threshold, value_list):
             sim_results.append(random_num)
 
         sim_rand_val = abs(np.mean(sim_results))
+        if math.isnan(sim_rand_val):
+            sim_rand_val = abs(np.median(sim_results))
+
         number = int(np.random.uniform() * 100)  # get a random number to see who wins
         if number > threshold:
             index_value.append(-sim_rand_val)
@@ -47,11 +51,11 @@ def run_simuations(simulations, iterations, threshold, value_list):
 if __name__ == '__main__':
 
     print('Hello...')
-    c_data_df = load_data('sp1000.csv')
+    c_data_df = load_data('sp500.csv')
     c_data_df.rename(columns=lambda x: x.strip(), inplace=True)
 
     c_data_df['Date'] = pd.to_datetime(c_data_df.Date)
-    data_df = c_data_df[c_data_df['Date'] < '01/01/2021']
+    data_df = c_data_df[c_data_df['Date'] < '01/01/2016']
 
     data_df = data_df.sort_values('Date')
     data_df['diff'] = data_df['Close'].diff()
@@ -59,30 +63,35 @@ if __name__ == '__main__':
     print(data_df.shape)
 
     close_val = data_df.iloc[-1]['Close']
+    print("Close={:.4f}".format(close_val))
+
+    # Evaluate Hurst equation
+    cls_data = data_df['Close'].tolist()
+    H, c, data = compute_Hc(cls_data, kind='price', simplified=True)
+    print("H={:.4f}, c={:.4f}".format(H, c))
 
     value_list = data_df['diff'].tolist()
     value_list = [0 if math.isnan(x) else x for x in value_list]
     threshold = int(data_df['trend'].sum()/data_df['trend'].count() * 100)
 
-    r_data_df = c_data_df[c_data_df['Date'] > '12/31/2020']
+    r_data_df = c_data_df[c_data_df['Date'] > '12/31/2015']
     r_data_df = r_data_df.sort_values('Date')
     iterations = r_data_df['Date'].count()
 
-    sim_list = run_simuations(1000, iterations, threshold, value_list)
-    sim_list_df = pd.DataFrame(sim_list)
-    r_data_df['sim1'] = sim_list_df
-    print(r_data_df.iloc[:10].to_string())
+    simH = 0
+    sim_diff = abs(simH - H)
+    loopCount = 0
+    while sim_diff > 0.02 and loopCount < 10:
 
-    sim_list = run_simuations(1000, iterations, threshold, value_list)
-    sim_list_df = pd.DataFrame(sim_list)
-    r_data_df['sim2'] = sim_list_df
-    print(r_data_df.iloc[:10].to_string())
-
-    sim_list = run_simuations(1000, iterations, threshold, value_list)
-    sim_list_df = pd.DataFrame(sim_list)
-    r_data_df['sim3'] = sim_list_df
-    print(r_data_df.iloc[:10].to_string())
+        loopCount += 1
+        sim_list = run_simuations(1000, iterations, threshold, value_list)
+        r_data_df['sim'] = sim_list
+        r_data_df['sim'] = r_data_df['sim'].cumsum()
+        r_data_df['sim_val'] = r_data_df['sim'] + close_val
+        cls_data = r_data_df['sim_val'].tolist()
+        simH, simC, data = compute_Hc(cls_data, kind='price', simplified=True)
+        sim_diff = abs(simH - H)
+        print("simH={:.4f}, simC={:.4f} loopCount={:1f} sim_diff={:.4f}".format(simH, simC, loopCount, sim_diff))
 
     #print(r_data_df.iloc[:10].to_string())
-
     r_data_df.to_csv('data/r_data_df.csv', index=False)
