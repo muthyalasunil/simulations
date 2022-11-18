@@ -6,9 +6,17 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 from numpy import random
+import datetime as dt
+from scipy import stats
+
 from hurst import compute_Hc
 
+import warnings
+
+warnings.filterwarnings("ignore")
+
 DATA_FOLDER = 'data'
+
 
 def load_data(filename):
     _data_df = pd.read_csv(DATA_FOLDER + '\\' + filename)
@@ -78,7 +86,10 @@ def evaluate_HC(c_data_df, years, span):
     data_df = c_data_df.iloc[-(span * years):]
     cls_data = data_df['Close'].tolist()
     H, c, data = compute_Hc(cls_data, kind='price', simplified=True)
-    return H, c, cls_data
+    slope, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data)), cls_data)
+
+    return H, c, cls_data, slope
+
 
 def project_forward(c_data_df, span):
     data_df = c_data_df.iloc[-(span * 2):].head(span)
@@ -113,19 +124,19 @@ if __name__ == '__main__':
     print("data_df beg={:s}, data_df end={:s}".format(str(c_data_df.iloc[0]['Date']), str(c_data_df.iloc[-1]['Date'])))
     span = 250
 
-    H3, c3, cls_data3 = evaluate_HC(c_data_df, 3, span)
-    print("H={:.4f}, c={:.4f}".format(H3, c3))
-    H5, c5, cls_data5 = evaluate_HC(c_data_df, 5, span)
-    print("H={:.4f}, c={:.4f}".format(H5, c5))
-    H7, c7, cls_data7 = evaluate_HC(c_data_df, 7, span)
-    print("H={:.4f}, c={:.4f}".format(H7, c7))
-    H10, c10, cls_data10 = evaluate_HC(c_data_df, 10, span)
-    print("H={:.4f}, c={:.4f}".format(H10, c10))
+    H3, c3, cls_data3, slope3 = evaluate_HC(c_data_df, 3, span)
+    print("slope 3yr ={:.4f}, H={:.4f}, c={:.4f}".format(slope3, H3, c3))
+    H5, c5, cls_data5, slope5 = evaluate_HC(c_data_df, 5, span)
+    print("slope 5yr ={:.4f}, H={:.4f}, c={:.4f}".format(slope5, H5, c5))
+    H7, c7, cls_data7, slope7 = evaluate_HC(c_data_df, 7, span)
+    print("slope 7yr ={:.4f}, H={:.4f}, c={:.4f}".format(slope7, H7, c7))
+    H10, c10, cls_data10, slope10 = evaluate_HC(c_data_df, 10, span)
+    print("slope 10yr ={:.4f}, H={:.4f}, c={:.4f}".format(slope10, H10, c10))
 
     r_data_df = project_forward(c_data_df, span)
 
     for i in range(1000):
-        col_name = 'sim' + str(i+1)
+        col_name = 'sim' + str(i + 1)
         sim_list = r_data_df[col_name].tolist()
 
         cls_data3 = cls_data3[:len(cls_data3) - len(sim_list)]
@@ -144,9 +155,9 @@ if __name__ == '__main__':
         cls_data10.extend(sim_list)
         simH10, simC10, data10 = compute_Hc(cls_data10, kind='price', simplified=True)
 
-        if abs(H3-simH3) < 0.001 and abs(H5-simH5) < 0.01 and abs(H7-simH7) < 0.01 and abs(H10-simH10) < 0.01:
-            print("diff H3={:.4f}, H5={:.4f} H7={:.4f}, H10={:.4f} ".format(H3 - simH3, H5 - simH5, H7 - simH7,
-                                                                            H10 - simH10))
+        if abs(H3 - simH3) < 0.001 and abs(H5 - simH5) < 0.01 and abs(H7 - simH7) < 0.01 and abs(H10 - simH10) < 0.01:
+            #slope, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data3)), cls_data3)
+            print("{:s} diff={:.4f}".format(col_name, abs(np.mean([abs(H3 - simH3), abs(H5 - simH5), abs(H7 - simH7), abs(H10 - simH10)]))))
         else:
             r_data_df.drop([col_name], axis=1, inplace=True)
 
