@@ -77,7 +77,7 @@ def run_simuations(simulations, iterations, threshold, value_list, r_data_df, cl
         r_data_df[col_name] = r_data_df[col_name].cumsum()
         r_data_df[col_name] = r_data_df[col_name] + close_val
         simH, simC, data = compute_Hc(r_data_df[col_name].tolist(), kind='price', simplified=True)
-        print("simH={:.4f}, simC={:.4f} col_name={:s}".format(simH, simC, col_name))
+        # print("simH={:.4f}, simC={:.4f} col_name={:s}".format(simH, simC, col_name))
         i += 1
     return r_data_df
 
@@ -115,7 +115,7 @@ def project_forward(c_data_df, span):
 
 if __name__ == '__main__':
     print('Hello...')
-    c_data_df = load_data('sp500.csv')
+    c_data_df = load_data('spbse100.csv')
     c_data_df.rename(columns=lambda x: x.strip(), inplace=True)
     c_data_df.drop(['Open', 'High', 'Low'], axis=1, inplace=True)
 
@@ -135,6 +135,7 @@ if __name__ == '__main__':
 
     r_data_df = project_forward(c_data_df, span)
 
+    simHmap = {}
     for i in range(1000):
         col_name = 'sim' + str(i + 1)
         sim_list = r_data_df[col_name].tolist()
@@ -142,33 +143,53 @@ if __name__ == '__main__':
         cls_data3 = cls_data3[:len(cls_data3) - len(sim_list)]
         cls_data3.extend(sim_list)
         simH3, simC3, data3 = compute_Hc(cls_data3, kind='price', simplified=True)
+        cls_slope3, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data3)), cls_data3)
 
         cls_data5 = cls_data5[:len(cls_data5) - len(sim_list)]
         cls_data5.extend(sim_list)
         simH5, simC5, data5 = compute_Hc(cls_data5, kind='price', simplified=True)
+        cls_slope5, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data5)), cls_data5)
 
         cls_data7 = cls_data7[:len(cls_data7) - len(sim_list)]
         cls_data7.extend(sim_list)
         simH7, simC7, data7 = compute_Hc(cls_data7, kind='price', simplified=True)
+        cls_slope7, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data7)), cls_data7)
 
         cls_data10 = cls_data10[:len(cls_data10) - len(sim_list)]
         cls_data10.extend(sim_list)
         simH10, simC10, data10 = compute_Hc(cls_data10, kind='price', simplified=True)
+        cls_slope10, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data10)), cls_data10)
 
-        if abs(H3 - simH3) < 0.001 and abs(H5 - simH5) < 0.01 and abs(H7 - simH7) < 0.01 and abs(H10 - simH10) < 0.01:
-            #slope, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data3)), cls_data3)
-            print("{:s} diff={:.4f}".format(col_name, abs(np.mean([abs(H3 - simH3), abs(H5 - simH5), abs(H7 - simH7), abs(H10 - simH10)]))))
+        simHmap[col_name] = np.mean([abs(H3 - simH3), abs(H5 - simH5), abs(H7 - simH7), abs(H10 - simH10),
+                                     abs(slope3 - cls_slope3), abs(slope5 - cls_slope5), abs(slope7 - cls_slope7),
+                                     abs(slope10 - cls_slope10)])
+
+    simHmap = dict(sorted(simHmap.items(), key=lambda item: item[1]))
+    topN = 3
+    for key in simHmap:
+        if topN < 0:
+            r_data_df.drop([key], axis=1, inplace=True)
         else:
-            r_data_df.drop([col_name], axis=1, inplace=True)
+            print(key)
+            print(simHmap[key])
 
-    r_data_df.to_csv('data/r_data_df.csv', index=False)
+        topN = topN - 1
+
+    r_data_df.to_csv('data/r_data_df.csv', index=True)
 
     '''
+
+    r_data_df.set_index('Date', inplace=True)
+    plt.plot(r_data_df['Close'], label='Close')
+    plt.plot(r_data_df['SMA20'], label='SMA20')
+    plt.plot(r_data_df['SMA50'], label='SMA50')
+    plt.legend(loc=2)
+    plt.show()
+    
     r_data_df.set_index('Date')
     plt.plot(r_data_df['sim_values'], linestyle='--', color='blue')
     plt.plot(r_data_df['Close'], linestyle='--', color='black')
 
-    plt.show();
     r_data_df.to_csv('data/r_data_df.csv', index=False)
     # print(r_data_df.iloc[:10].to_string())
     '''
