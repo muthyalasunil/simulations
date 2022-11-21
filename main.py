@@ -8,7 +8,7 @@ import pandas as pd
 from numpy import random
 import datetime as dt
 from scipy import stats
-
+import statistics
 from hurst import compute_Hc
 
 import warnings
@@ -86,20 +86,22 @@ def evaluate_HC(c_data_df, years, span):
     data_df = c_data_df.iloc[-(span * years):]
     cls_data = data_df['Close'].tolist()
     H, c, data = compute_Hc(cls_data, kind='price', simplified=True)
-    slope, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data)), cls_data)
+    #slope, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data)), cls_data)
+    stddev = statistics.stdev(cls_data)
 
-    return H, c, cls_data, slope
+    return H, c, cls_data, stddev
 
 
 def project_forward(c_data_df, span):
     data_df = c_data_df.iloc[-(span * 2):].head(span)
     r_data_df = c_data_df.iloc[-span:]
-    print("begin={:s}, end={:s}".format(str(data_df.iloc[0]['Date']), str(data_df.iloc[-1]['Date'])))
-    c_data_df['diff'] = c_data_df['Close'].diff()
-    c_data_df['trend'] = np.where(c_data_df['diff'] > 0, 1, 0)
 
+    print("base data begin={:s}, end={:s}".format(str(data_df.iloc[0]['Date']), str(data_df.iloc[-1]['Date'])))
     close_val = data_df.iloc[-1]['Close']
     print("Close={:.4f}".format(close_val))
+
+    c_data_df['diff'] = c_data_df['Close'].diff()
+    c_data_df['trend'] = np.where(c_data_df['diff'] > 0, 1, 0)
 
     value_list = c_data_df['diff'].tolist()
     value_list = [0 if math.isnan(x) else x for x in value_list]
@@ -115,27 +117,31 @@ def project_forward(c_data_df, span):
 
 if __name__ == '__main__':
     print('Hello...')
-    c_data_df = load_data('spbse100.csv')
+    c_data_df = load_data('sp500.csv')
     c_data_df.rename(columns=lambda x: x.strip(), inplace=True)
     c_data_df.drop(['Open', 'High', 'Low'], axis=1, inplace=True)
 
     c_data_df['Date'] = pd.to_datetime(c_data_df.Date)
     c_data_df = c_data_df.sort_values('Date')
+    c_data_df = c_data_df[c_data_df['Date'] < '11/19/2020']
+
     print("data_df beg={:s}, data_df end={:s}".format(str(c_data_df.iloc[0]['Date']), str(c_data_df.iloc[-1]['Date'])))
     span = 250
 
-    H3, c3, cls_data3, slope3 = evaluate_HC(c_data_df, 3, span)
-    print("slope 3yr ={:.4f}, H={:.4f}, c={:.4f}".format(slope3, H3, c3))
-    H5, c5, cls_data5, slope5 = evaluate_HC(c_data_df, 5, span)
-    print("slope 5yr ={:.4f}, H={:.4f}, c={:.4f}".format(slope5, H5, c5))
-    H7, c7, cls_data7, slope7 = evaluate_HC(c_data_df, 7, span)
-    print("slope 7yr ={:.4f}, H={:.4f}, c={:.4f}".format(slope7, H7, c7))
-    H10, c10, cls_data10, slope10 = evaluate_HC(c_data_df, 10, span)
-    print("slope 10yr ={:.4f}, H={:.4f}, c={:.4f}".format(slope10, H10, c10))
+    H3, c3, cls_data3, stddev3 = evaluate_HC(c_data_df, 3, span)
+    print("std 3yr ={:.4f}, H={:.4f}, c={:.4f}".format(stddev3, H3, c3))
+    H5, c5, cls_data5, stddev5 = evaluate_HC(c_data_df, 5, span)
+    print("std 5yr ={:.4f}, H={:.4f}, c={:.4f}".format(stddev5, H5, c5))
+    H7, c7, cls_data7, stddev7 = evaluate_HC(c_data_df, 7, span)
+    print("std 7yr ={:.4f}, H={:.4f}, c={:.4f}".format(stddev7, H7, c7))
+    H10, c10, cls_data10, stddev10 = evaluate_HC(c_data_df, 10, span)
+    print("std 10yr ={:.4f}, H={:.4f}, c={:.4f}".format(stddev10, H10, c10))
 
     r_data_df = project_forward(c_data_df, span)
 
     simHmap = {}
+    simSmap = {}
+
     for i in range(1000):
         col_name = 'sim' + str(i + 1)
         sim_list = r_data_df[col_name].tolist()
@@ -143,26 +149,27 @@ if __name__ == '__main__':
         cls_data3 = cls_data3[:len(cls_data3) - len(sim_list)]
         cls_data3.extend(sim_list)
         simH3, simC3, data3 = compute_Hc(cls_data3, kind='price', simplified=True)
-        cls_slope3, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data3)), cls_data3)
+        cls_stddev3 = statistics.stdev(cls_data3)
 
         cls_data5 = cls_data5[:len(cls_data5) - len(sim_list)]
         cls_data5.extend(sim_list)
         simH5, simC5, data5 = compute_Hc(cls_data5, kind='price', simplified=True)
-        cls_slope5, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data5)), cls_data5)
+        cls_stddev5 = statistics.stdev(cls_data5)
 
         cls_data7 = cls_data7[:len(cls_data7) - len(sim_list)]
         cls_data7.extend(sim_list)
         simH7, simC7, data7 = compute_Hc(cls_data7, kind='price', simplified=True)
-        cls_slope7, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data7)), cls_data7)
+        cls_stddev7 = statistics.stdev(cls_data7)
 
         cls_data10 = cls_data10[:len(cls_data10) - len(sim_list)]
         cls_data10.extend(sim_list)
         simH10, simC10, data10 = compute_Hc(cls_data10, kind='price', simplified=True)
-        cls_slope10, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data10)), cls_data10)
+        cls_stddev10 = statistics.stdev(cls_data10)
 
         simHmap[col_name] = np.mean([abs(H3 - simH3), abs(H5 - simH5), abs(H7 - simH7), abs(H10 - simH10),
-                                     abs(slope3 - cls_slope3), abs(slope5 - cls_slope5), abs(slope7 - cls_slope7),
-                                     abs(slope10 - cls_slope10)])
+                                     abs(stddev3 - cls_stddev3), abs(stddev5 - cls_stddev5), abs(stddev7 - cls_stddev7),
+                                     abs(stddev10 - cls_stddev10)])
+        simSmap[col_name] = [cls_stddev3, cls_stddev5, cls_stddev7, cls_stddev10]
 
     simHmap = dict(sorted(simHmap.items(), key=lambda item: item[1]))
     topN = 3
@@ -171,25 +178,25 @@ if __name__ == '__main__':
             r_data_df.drop([key], axis=1, inplace=True)
         else:
             print(key)
-            print(simHmap[key])
+            print(simSmap[key])
 
-        topN = topN - 1
-
-    r_data_df.to_csv('data/r_data_df.csv', index=True)
-
-    '''
-
-    r_data_df.set_index('Date', inplace=True)
-    plt.plot(r_data_df['Close'], label='Close')
-    plt.plot(r_data_df['SMA20'], label='SMA20')
-    plt.plot(r_data_df['SMA50'], label='SMA50')
-    plt.legend(loc=2)
-    plt.show()
-    
-    r_data_df.set_index('Date')
-    plt.plot(r_data_df['sim_values'], linestyle='--', color='blue')
-    plt.plot(r_data_df['Close'], linestyle='--', color='black')
+            topN = topN - 1
 
     r_data_df.to_csv('data/r_data_df.csv', index=False)
-    # print(r_data_df.iloc[:10].to_string())
+
+    '''
+        
+            r_data_df.set_index('Date', inplace=True)
+            plt.plot(r_data_df['Close'], label='Close')
+            plt.plot(r_data_df['SMA20'], label='SMA20')
+            plt.plot(r_data_df['SMA50'], label='SMA50')
+            plt.legend(loc=2)
+            plt.show()
+            
+            r_data_df.set_index('Date')
+            plt.plot(r_data_df['sim_values'], linestyle='--', color='blue')
+            plt.plot(r_data_df['Close'], linestyle='--', color='black')
+        
+            r_data_df.to_csv('data/r_data_df.csv', index=False)
+            # print(r_data_df.iloc[:10].to_string())
     '''
