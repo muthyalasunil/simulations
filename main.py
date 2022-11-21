@@ -117,13 +117,13 @@ def project_forward(c_data_df, span):
 
 if __name__ == '__main__':
     print('Hello...')
-    c_data_df = load_data('sp500.csv')
+    c_data_df = load_data('spbse100.csv')
     c_data_df.rename(columns=lambda x: x.strip(), inplace=True)
     c_data_df.drop(['Open', 'High', 'Low'], axis=1, inplace=True)
 
     c_data_df['Date'] = pd.to_datetime(c_data_df.Date)
     c_data_df = c_data_df.sort_values('Date')
-    c_data_df = c_data_df[c_data_df['Date'] < '11/19/2020']
+    #c_data_df = c_data_df[c_data_df['Date'] < '11/19/2020']
 
     print("data_df beg={:s}, data_df end={:s}".format(str(c_data_df.iloc[0]['Date']), str(c_data_df.iloc[-1]['Date'])))
     span = 250
@@ -166,21 +166,29 @@ if __name__ == '__main__':
         simH10, simC10, data10 = compute_Hc(cls_data10, kind='price', simplified=True)
         cls_stddev10 = statistics.stdev(cls_data10)
 
-        simHmap[col_name] = np.mean([abs(H3 - simH3), abs(H5 - simH5), abs(H7 - simH7), abs(H10 - simH10),
-                                     abs(stddev3 - cls_stddev3), abs(stddev5 - cls_stddev5), abs(stddev7 - cls_stddev7),
+        simHmap[col_name] = np.mean([abs(H3 - simH3), abs(H5 - simH5), abs(H7 - simH7), abs(H10 - simH10)])
+        simSmap[col_name] = np.mean([abs(stddev3 - cls_stddev3), abs(stddev5 - cls_stddev5), abs(stddev7 - cls_stddev7),
                                      abs(stddev10 - cls_stddev10)])
-        simSmap[col_name] = [cls_stddev3, cls_stddev5, cls_stddev7, cls_stddev10]
 
     simHmap = dict(sorted(simHmap.items(), key=lambda item: item[1]))
     topN = 3
     for key in simHmap:
         if topN < 0:
             r_data_df.drop([key], axis=1, inplace=True)
+            del simSmap[key]
         else:
             print(key)
             print(simSmap[key])
 
             topN = topN - 1
+
+    simSmap = dict(sorted(simSmap.items(), key=lambda item: item[1]))
+    topN = 1
+    for key in simSmap:
+        if topN == 1:
+            print(key)
+            print(simSmap[key])
+        break
 
     r_data_df.to_csv('data/r_data_df.csv', index=False)
 
