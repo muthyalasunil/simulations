@@ -197,7 +197,16 @@ if __name__ == '__main__':
             print(key + ':'+ str(simSmap[key]))
         break
 
-    r_data_df.to_csv('data/r_data_df.csv', index=False)
+    r_data_df.set_index('Date', inplace=True)
+    c_data_df.set_index('Date', inplace=True)
+    c_data_df.drop(['diff', 'trend'], axis=1, inplace=True)
+
+    plt.plot(r_data_df)
+    plt.plot(c_data_df)
+    plt.legend(loc='best')
+    plt.show()
+
+    r_data_df.to_csv('data/r_data_df.csv', index=True)
 
     '''
         
