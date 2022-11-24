@@ -103,7 +103,7 @@ def project_forward(c_data_df, span):
     c_data_df['diff'] = c_data_df['Close'].diff()
     c_data_df['trend'] = np.where(c_data_df['diff'] > 0, 1, 0)
 
-    value_list = data_df['Close'].diff().tolist() #c_data_df['diff'].tolist()
+    value_list = data_df['Close'].diff().tolist()  # c_data_df['diff'].tolist()
     value_list = [0 if math.isnan(x) else x for x in value_list]
     value_list = set(value_list)
     # convert the set to the list
@@ -115,15 +115,30 @@ def project_forward(c_data_df, span):
     return ret_data_df
 
 
+def plot_corr(r_data_df, r1=20, r2=50):
+    for col in r_data_df.columns:
+        r_data_df[col + '_20'] = r_data_df[col].rolling(r1).std()
+        r_data_df[col + '_50'] = r_data_df[col].rolling(r2).std()
+        r_data_df.drop([col], axis=1, inplace=True)
+
+    r_data_df = r_data_df.dropna()
+    fig, ax = plt.subplots(figsize=(10, 6))
+    corr50 = r_data_df.corr()[['Close_50']].sort_values(by='Close_50', ascending=False)
+    sns.heatmap(corr50, annot=True)
+
+    #sns.heatmap(r_data_df.corr(), ax=ax, annot=True)
+    return r_data_df.corr()
+
+
 if __name__ == '__main__':
     print('Hello...')
-    c_data_df = load_data('spbse100.csv')
+    c_data_df = load_data('sp500.csv')
     c_data_df.rename(columns=lambda x: x.strip(), inplace=True)
     c_data_df.drop(['Open', 'High', 'Low'], axis=1, inplace=True)
 
     c_data_df['Date'] = pd.to_datetime(c_data_df.Date)
     c_data_df = c_data_df.sort_values('Date')
-    #c_data_df = c_data_df[c_data_df['Date'] < '11/19/2020']
+    c_data_df = c_data_df[c_data_df['Date'] < '01/01/2022']
 
     print("data_df beg={:s}, data_df end={:s}".format(str(c_data_df.iloc[0]['Date']), str(c_data_df.iloc[-1]['Date'])))
     span = 250
@@ -178,17 +193,28 @@ if __name__ == '__main__':
 
     simHmap = dict(sorted(simHmap.items(), key=lambda item: item[1]))
     topN = 3
+    r1, r2 = 20, 50
     for key in simHmap:
         if topN < 0:
             r_data_df.drop([key], axis=1, inplace=True)
             del simSmap[key]
         else:
-            print(key)
-            print(simHmap[key])
+            print(key + ' HC: ' + str(simHmap[key]))
+            print(key + ' stddev:'+ str(simSmap[key]))
 
-            topN = topN - 1
+        topN = topN - 1
 
-    simSmap = dict(sorted(simSmap.items(), key=lambda item: item[1]))
+    r_data_df.set_index('Date', inplace=True)
+    r_data_df_corr = plot_corr(r_data_df.copy(), 20, 50)
+
+    r_data_df.plot(kind='line')
+    plt.legend(loc='best')
+    plt.show()
+
+    r_data_df.to_csv('data/r_data_df.csv', index=True)
+
+    '''
+     simSmap = dict(sorted(simSmap.items(), key=lambda item: item[1]))
     topN = 1
     topKey = ''
     for key in simSmap:
@@ -196,21 +222,17 @@ if __name__ == '__main__':
             topKey = key
             print(key + ':'+ str(simSmap[key]))
         break
-
-    r_data_df.set_index('Date', inplace=True)
-    c_data_df.set_index('Date', inplace=True)
-    c_data_df.drop(['diff', 'trend'], axis=1, inplace=True)
-
-    plt.plot(r_data_df)
-    plt.plot(c_data_df)
-    plt.legend(loc='best')
-    plt.show()
-
-    r_data_df.to_csv('data/r_data_df.csv', index=True)
-
-    '''
-        
+            
             r_data_df.set_index('Date', inplace=True)
+            c_data_df.drop(['diff', 'trend'], axis=1, inplace=True)
+        
+            plt.plot(r_data_df)
+            plt.plot(c_data_df.tail(span*2))
+            plt.legend(loc='best')
+            plt.show()
+        
+            r_data_df.to_csv('data/r_data_df.csv', index=True)        
+                    r_data_df.set_index('Date', inplace=True)
             plt.plot(r_data_df['Close'], label='Close')
             plt.plot(r_data_df['SMA20'], label='SMA20')
             plt.plot(r_data_df['SMA50'], label='SMA50')
