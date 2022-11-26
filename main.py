@@ -139,18 +139,33 @@ def plot_corr(r_data_df, r1=20, r2=50, plot=False):
 
     return corr20.join(corr50, how="inner")
 
+def plot_slope(r_data_df):
+    dict_slope = {}
+    cols = r_data_df.columns.values
+    cls_data = r_data_df['Close'].tolist()
+    cls_slope, inter, r_val, p_val, std_err = stats.linregress(range(len(cls_data)), cls_data)
+    dict_slope['Close'] = cls_slope
+    for col in cols:
+        if col not in 'Close':
+            sim_data = r_data_df[col].tolist()
+            cls_data = r_data_df['Close'].tolist()
+            cls_data.extend(sim_data)
+            cls_sim_slp, inter, r_val, p_val, std_err = stats.linregress(range(len(cls_data)), cls_data)
+            dict_slope[col] = cls_sim_slp - cls_slope
+    return dict_slope
+
 
 def project_close_values(c_data_df, span=250):
     print("data_df beg={:s}, data_df end={:s}".format(str(c_data_df.iloc[0]['Date']), str(c_data_df.iloc[-1]['Date'])))
 
     H3, c3, cls_data3, stddev3, slp3 = evaluate_HC(c_data_df, 3, span)
-    print("std 3yr ={:.4f}, H={:.4f}".format(stddev3, H3))
+    #print("std 3yr ={:.4f}, H={:.4f}".format(stddev3, H3))
     H5, c5, cls_data5, stddev5, slp5 = evaluate_HC(c_data_df, 5, span)
-    print("std 5yr ={:.4f}, H={:.4f}".format(stddev5, H5))
+    #print("std 5yr ={:.4f}, H={:.4f}".format(stddev5, H5))
     H7, c7, cls_data7, stddev7, slp7 = evaluate_HC(c_data_df, 7, span)
-    print("std 7yr ={:.4f}, H={:.4f}".format(stddev7, H7))
+    #print("std 7yr ={:.4f}, H={:.4f}".format(stddev7, H7))
     H10, c10, cls_data10, stddev10, slp10 = evaluate_HC(c_data_df, 10, span)
-    print("std 10yr ={:.4f}, H={:.4f}".format(stddev10, H10))
+    #print("std 10yr ={:.4f}, H={:.4f}".format(stddev10, H10))
 
     r_data_df = project_forward(c_data_df, span)
 
@@ -198,35 +213,27 @@ def project_close_values(c_data_df, span=250):
         if topN < 0:
             r_data_df.drop([key], axis=1, inplace=True)
             del simSmap[key]
-        else:
-            print(key + ' stddev:' + str(simSmap[key]))
-
         topN = topN - 1
 
     r_data_df.set_index('Date', inplace=True)
     prev_close_df = c_data_df.iloc[-(span * 2):].head(span)
     r_data_df_copy = r_data_df.copy()
     r_data_df_copy['Close'] = np.array(prev_close_df['Close']).tolist()
+    slp_dict = plot_slope(r_data_df_copy)
+    cls_std = statistics.stdev(r_data_df_copy['Close'].tolist())
+
     results = plot_corr(r_data_df_copy, 20, 50)
 
     for idx in results.index.values:
-        if idx.split('_')[0] in simSmap:
-            results.at[idx, 'stddev_diff'] = simSmap[idx.split('_')[0]]
-            results.at[idx, 'close_diff'] = abs(r_data_df.iloc[-1][idx] - r_data_df.iloc[-1]['Close'])
+        key = idx.split('_')[0]
+        if key in simSmap:
+            sim_std = statistics.stdev(r_data_df[key].tolist())
+            results.at[idx, 'stddev_sum'] = abs(cls_std-sim_std)
+            results.at[idx, 'slope_diff'] = slp_dict[key]
+            results.at[idx, 'close_diff'] = abs((r_data_df.iloc[-1]['Close'] - r_data_df.iloc[-1][idx])/r_data_df.iloc[-1]['Close'])
 
-    print(results)
-
-    '''
-    for col in r_data_df.columns:
-        print(col + ':' + str(r_data_df.iloc[-1][col]))
-    
-
-    # r_data_df.plot(kind='line')
-    # plt.legend(loc='best')
-    # plt.show()
-
-    r_data_df.to_csv('data/r_data_df.csv', index=True)
-    '''
+    #r_data_df.to_csv('data/r_data_df.csv', index=True)
+    return results
 
 
 if __name__ == '__main__':
@@ -237,31 +244,41 @@ if __name__ == '__main__':
 
     c_data_df['Date'] = pd.to_datetime(c_data_df.Date)
     c_data_df = c_data_df.sort_values('Date')
-    c_data_df = c_data_df[c_data_df['Date'] < '01/01/2020']
+    rs_map = {}
+    for i in range(6):
+        str_date =  '10/07/20'#22'
+        str_date =  '10/07/20' + str(15+i)
+        print(str_date)
+        _data_df = c_data_df[c_data_df['Date'] < str_date]
+        results = project_close_values(_data_df)
+        rs_map[str_date] = results
 
-    project_close_values(c_data_df)
+    for key in rs_map:
+        print(rs_map[key])
 
-    ''' 
+
+    '''
+    r_data_df.set_index('Date', inplace=True)
+    c_data_df.drop(['diff', 'trend'], axis=1, inplace=True)
+
+    plt.plot(r_data_df)
+    plt.plot(c_data_df.tail(span*2))
+    plt.legend(loc='best')
+    plt.show()
+
+    r_data_df.to_csv('data/r_data_df.csv', index=True)        
             r_data_df.set_index('Date', inplace=True)
-            c_data_df.drop(['diff', 'trend'], axis=1, inplace=True)
-        
-            plt.plot(r_data_df)
-            plt.plot(c_data_df.tail(span*2))
-            plt.legend(loc='best')
-            plt.show()
-        
-            r_data_df.to_csv('data/r_data_df.csv', index=True)        
-                    r_data_df.set_index('Date', inplace=True)
-            plt.plot(r_data_df['Close'], label='Close')
-            plt.plot(r_data_df['SMA20'], label='SMA20')
-            plt.plot(r_data_df['SMA50'], label='SMA50')
-            plt.legend(loc=2)
-            plt.show()
-            
-            r_data_df.set_index('Date')
-            plt.plot(r_data_df['sim_values'], linestyle='--', color='blue')
-            plt.plot(r_data_df['Close'], linestyle='--', color='black')
-        
-            r_data_df.to_csv('data/r_data_df.csv', index=False)
-            # print(r_data_df.iloc[:10].to_string())
+    plt.plot(r_data_df['Close'], label='Close')
+    plt.plot(r_data_df['SMA20'], label='SMA20')
+    plt.plot(r_data_df['SMA50'], label='SMA50')
+    plt.legend(loc=2)
+    plt.show()
+    
+    r_data_df.set_index('Date')
+    plt.plot(r_data_df['sim_values'], linestyle='--', color='blue')
+    plt.plot(r_data_df['Close'], linestyle='--', color='black')
+
+    r_data_df.to_csv('data/r_data_df.csv', index=False)
+    # print(r_data_df.iloc[:10].to_string())
+    
     '''
