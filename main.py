@@ -199,7 +199,7 @@ def project_close_values(c_data_df, span=250):
                                      abs(slp10 - cls_slp10)])
 
     simHmap = dict(sorted(simHmap.items(), key=lambda item: item[1]))
-    topN = 10
+    topN = 25
     for key in simHmap:
         if topN < 0:
             r_data_df.drop([key], axis=1, inplace=True)
@@ -284,9 +284,9 @@ def prepare_simulation_data():
         myfile.close()
 
 
-if __name__ == '__main__':
+def test_simulations():
 
-    print('main...')
+    print('test_simulations...')
 
     with open('data/r_test.csv', 'w', newline='') as myfile:
         wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
@@ -299,7 +299,7 @@ if __name__ == '__main__':
         c_data_df['Date'] = pd.to_datetime(c_data_df.Date)
         c_data_df = c_data_df.sort_values('Date')
 
-        str_date = '10/07/2021'  # 22'
+        str_date = '10/07/2018'  # 22'
         _data_df = c_data_df[c_data_df['Date'] < str_date]
         base_vals, sim_vals_dict = project_close_values(_data_df)
 
@@ -316,7 +316,10 @@ if __name__ == '__main__':
     filename = 'r_test.csv'
     _data_df = load_data(filename)
     print(_data_df.shape)
-    y_pred = mlmodel.pred_simulations(_data_df)
+    dataset = _data_df.values
+    Y = dataset[:, 32]
+
+    y_pred = mlmodel.predict_nn(_data_df)
     r_data_df = load_data('r_data_df.csv')
     cols = r_data_df.columns.values
     i = 0
@@ -325,9 +328,13 @@ if __name__ == '__main__':
             if y_pred[i] > 0:
                 close_val = r_data_df.iloc[-1]['Close']
                 sim_val = r_data_df.iloc[-1][col]
-                print("sim={:s}, pred={:s} close={:f} simcls={:f}".format(col, str(y_pred[i]), close_val, sim_val))
+                print("sim={:s}, actual={:d} pred={:d} close={:f} simcls={:f}".format(col, Y[i], y_pred[i], close_val, sim_val))
             i = i+1
 
+
+if __name__ == '__main__':
+
+    test_simulations()
 
     '''
     r_data_df.set_index('Date', inplace=True)

@@ -1,28 +1,28 @@
 # This is a sample Python script.
 
+import pickle
+
+import matplotlib.pyplot as plt
+import numpy as np
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-import datetime
 import pandas as pd
-import numpy as np
-import pickle
-from collections import Counter
-
-from matplotlib import pyplot
-from sklearn.model_selection import train_test_split
+from keras.layers import Dense
+from keras.models import Sequential
+from keras.saving.save import load_model
+from keras.wrappers.scikit_learn import KerasClassifier, KerasRegressor
 from sklearn import metrics, preprocessing
-from sklearn import svm
-
-from sklearn.linear_model import LinearRegression
-from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import roc_curve
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
-import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve
+from sklearn.model_selection import KFold
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.model_selection import StratifiedKFold
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 
 DATA_FOLDER = 'data'
 
@@ -45,7 +45,6 @@ def test_train(data_df):
 
     # Saving feature names for later use
     feature_list = list(features.columns)
-    print(len(feature_list))
 
     # perform a robust scaler transform of the dataset
     trans = StandardScaler()
@@ -58,9 +57,7 @@ def test_train(data_df):
 
     # Split the data into training and testing sets
     train_features, test_features, train_labels, test_labels = train_test_split(features, labels, test_size=0.25,
-                                                                                random_state=1, stratify=labels)
-    print(Counter(train_labels))
-    print(Counter(test_labels))
+                                                                                random_state=1)
 
     log_reg = LogisticRegression(random_state=0, solver='saga', max_iter=1000, multi_class='auto').fit(train_features,
                                                                                                        train_labels)
@@ -153,20 +150,148 @@ def pred_simulations(data_df):
     loaded_model = pickle.load(open(filename, 'rb'))
     y_pred = loaded_model.predict(features)
     print("rf Predicted:", metrics.accuracy_score(labels, y_pred))
+    print(y_pred)
     confusion_matrix = pd.crosstab(labels, y_pred, rownames=['Actual'], colnames=['Predicted'])
     print(confusion_matrix)
     return y_pred
 
 
-if __name__ == '__main__':
+# define baseline model
+def baseline_model():
+    # create model
+    model = Sequential()
+    model.add(Dense(32, input_dim=32, activation='relu'))
+    model.add(Dense(2, activation='softmax'))
+    # Compile model
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+    return model
 
+
+def larger_model():
+    # create model
+    model = Sequential()
+    model.add(Dense(32, input_shape=(32,), activation='relu'))
+    model.add(Dense(16, activation='relu'))
+    model.add(Dense(1, activation='sigmoid'))
+    # Compile model
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    return model
+
+
+if __name__ == '__main__':
     # filename = 'r_feature.csv'
     # _data_df = load_data(filename)
     # print(_data_df.shape)
     # _data_df = build_features(_data_df)
     # test_train(_data_df)
+    #
+    # filename = 'r_test.csv'
+    # _data_df = load_data(filename)
+    # print(_data_df.shape)
+    # pred_simulations(_data_df)
 
-    filename = 'r_test.csv'
-    _data_df = load_data(filename)
-    print(_data_df.shape)
-    pred_simulations(_data_df)
+    data_df = load_data('r_feature_l.csv')
+    arr_index = data_df.idxname.unique()
+    le = preprocessing.LabelEncoder()
+    le.fit(arr_index)
+    data_df['idxname'] = le.transform(data_df['idxname'])
+
+    dataset = data_df.values
+    X = dataset[:, 0:32].astype(float)
+    Y = dataset[:, 32]
+    print(X.shape)
+    print(Y.shape)
+
+
+def predict_nn(data_df):
+    # load dataset
+    # data_df = load_data('r_feature.csv')
+    arr_index = data_df.idxname.unique()
+    le = preprocessing.LabelEncoder()
+    le.fit(arr_index)
+    data_df['idxname'] = le.transform(data_df['idxname'])
+
+    dataset = data_df.values
+    X = dataset[:, 0:32].astype(float)
+    Y = dataset[:, 32]
+    print(X.shape)
+    print(Y.shape)
+
+    # load model
+    model = load_model('model.h5')
+    # summarize model.
+    model.summary()
+
+    # make class predictions with the model
+    predictions = (model.predict(X) > 0.5).astype(int)
+    print("rf Predicted:", metrics.accuracy_score(Y, predictions))
+    return predictions
+
+    # summarize the first 5 cases
+    #for i in range(len(Y)):
+        #print('=> %d (expected %d)' % (predictions[i], Y[i]))
+
+    # estimator = KerasClassifier(build_fn=larger_model, epochs=200, batch_size=5, verbose=0)
+    # kfold = StratifiedKFold(n_splits=10, shuffle=True)
+    # results = cross_val_score(estimator, X, Y, cv=kfold)
+    # print("Baseline: %.2f%% (%.2f%%)" % (results.mean() * 100, results.std() * 100))
+    # estimators = []
+    # estimators.append(('standardize', StandardScaler()))
+    # estimators.append(('mlp', KerasClassifier(model=baseline_model, epochs=100, batch_size=5, verbose=0)))
+    # pipeline = Pipeline(estimators)
+    # kfold = KFold(n_splits=10, shuffle=True) #StratifiedKFold(n_splits=10, shuffle=True)
+    # results = cross_val_score(pipeline, X, Y, cv=kfold)
+    # print("Standardized: %.2f%% (%.2f%%)" % (results.mean()*100, results.std()*100))
+
+
+def build_save_nn(data_df):
+    # data_df = load_data('r_feature_l.csv')
+    arr_index = data_df.idxname.unique()
+    le = preprocessing.LabelEncoder()
+    le.fit(arr_index)
+    data_df['idxname'] = le.transform(data_df['idxname'])
+
+    dataset = data_df.values
+    X = dataset[:, 0:32].astype(float)
+    Y = dataset[:, 32]
+    print(X.shape)
+    print(Y.shape)
+    # define model
+    model = Sequential()
+    model.add(Dense(96, input_dim=32, activation='relu'))
+    model.add(Dense(32, activation='relu'))
+    model.add(Dense(1, activation='sigmoid'))
+    # compile model
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+    # Fit the model -acc 84, 63
+    model.fit(X, Y, epochs=200, batch_size=10)
+    # evaluate the model
+    scores = model.evaluate(X, Y)
+    print("%s: %.2f%%" % (model.metrics_names[1], scores[1] * 100))
+    # save model and architecture to single file
+    model.save("model.h5")
+    print("Saved model to disk")
+
+
+def evaluate_nn(data_df):
+    # load model
+    model = load_model('model.h5')
+    # summarize model.
+    model.summary()
+    # load dataset
+    # data_df = load_data('r_feature.csv')
+    arr_index = data_df.idxname.unique()
+    le = preprocessing.LabelEncoder()
+    le.fit(arr_index)
+    data_df['idxname'] = le.transform(data_df['idxname'])
+
+    dataset = data_df.values
+    X = dataset[:, 0:32].astype(float)
+    Y = dataset[:, 32]
+    print(X.shape)
+    print(Y.shape)
+
+    # evaluate the model
+    score = model.evaluate(X, Y, verbose=0)
+    print("%s: %.2f%%" % (model.metrics_names[1], score[1] * 100))
