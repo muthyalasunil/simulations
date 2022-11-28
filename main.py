@@ -299,7 +299,7 @@ def test_simulations():
         c_data_df['Date'] = pd.to_datetime(c_data_df.Date)
         c_data_df = c_data_df.sort_values('Date')
 
-        str_date = '10/07/2018'  # 22'
+        str_date = '02/03/2020'  # 22'
         _data_df = c_data_df[c_data_df['Date'] < str_date]
         base_vals, sim_vals_dict = project_close_values(_data_df)
 
@@ -319,17 +319,20 @@ def test_simulations():
     dataset = _data_df.values
     Y = dataset[:, 32]
 
-    y_pred = mlmodel.predict_nn(_data_df)
+    confidences = mlmodel.predict_nn(_data_df)
     r_data_df = load_data('r_data_df.csv')
     cols = r_data_df.columns.values
     i = 0
     for col in cols:
         if 'sim' in col:
-            if y_pred[i] > 0:
-                close_val = r_data_df.iloc[-1]['Close']
-                sim_val = r_data_df.iloc[-1][col]
-                print("sim={:s}, actual={:d} pred={:d} close={:f} simcls={:f}".format(col, Y[i], y_pred[i], close_val, sim_val))
+            close_val = r_data_df.iloc[-1]['Close']
+            sim_val = r_data_df.iloc[-1][col]
+            if confidences[i] < 0.55:
+                r_data_df.drop([col], axis=1, inplace=True)
+            print("sim={:s}, actual={:s} pred={:s} close={:f} simcls={:f}".format(col, str(Y[i]), str(confidences[i]), close_val, sim_val))
             i = i+1
+
+    r_data_df.to_csv('data/nn_data_df.csv', index=False)
 
 
 if __name__ == '__main__':

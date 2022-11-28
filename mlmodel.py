@@ -178,30 +178,6 @@ def larger_model():
     return model
 
 
-if __name__ == '__main__':
-    # filename = 'r_feature.csv'
-    # _data_df = load_data(filename)
-    # print(_data_df.shape)
-    # _data_df = build_features(_data_df)
-    # test_train(_data_df)
-    #
-    # filename = 'r_test.csv'
-    # _data_df = load_data(filename)
-    # print(_data_df.shape)
-    # pred_simulations(_data_df)
-
-    data_df = load_data('r_feature_l.csv')
-    arr_index = data_df.idxname.unique()
-    le = preprocessing.LabelEncoder()
-    le.fit(arr_index)
-    data_df['idxname'] = le.transform(data_df['idxname'])
-
-    dataset = data_df.values
-    X = dataset[:, 0:32].astype(float)
-    Y = dataset[:, 32]
-    print(X.shape)
-    print(Y.shape)
-
 
 def predict_nn(data_df):
     # load dataset
@@ -223,9 +199,29 @@ def predict_nn(data_df):
     model.summary()
 
     # make class predictions with the model
-    predictions = (model.predict(X) > 0.5).astype(int)
+    confidences = model.predict(X)
+    predictions = np.concatenate((confidences > 0.6).astype(int), axis=0)
     print("rf Predicted:", metrics.accuracy_score(Y, predictions))
-    return predictions
+    confusion_matrix = pd.crosstab(Y, predictions, rownames=['Actual'], colnames=['Predicted'])
+    print(confusion_matrix)
+    return confidences
+
+
+if __name__ == '__main__':
+
+    data_df = load_data('r_test.csv')
+    predict_nn(data_df)
+
+    # filename = 'r_feature.csv'
+    # _data_df = load_data(filename)
+    # print(_data_df.shape)
+    # _data_df = build_features(_data_df)
+    # test_train(_data_df)
+    #
+    # filename = 'r_test.csv'
+    # _data_df = load_data(filename)
+    # print(_data_df.shape)
+    # pred_simulations(_data_df)
 
     # summarize the first 5 cases
     #for i in range(len(Y)):
