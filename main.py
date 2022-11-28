@@ -299,7 +299,7 @@ def test_simulations():
         c_data_df['Date'] = pd.to_datetime(c_data_df.Date)
         c_data_df = c_data_df.sort_values('Date')
 
-        str_date = '02/03/2020'  # 22'
+        str_date = '04/03/2019'  # 22'
         _data_df = c_data_df[c_data_df['Date'] < str_date]
         base_vals, sim_vals_dict = project_close_values(_data_df)
 
