@@ -1,10 +1,12 @@
 import csv
+import datetime
 import math
 
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+from dateutil.parser import parser
 from numpy import random
 import datetime as dt
 from scipy import stats
@@ -94,8 +96,10 @@ def evaluate_HC(c_data_df, years, span):
 
 
 def project_forward(c_data_df, span):
-    data_df = c_data_df.iloc[-(span * 2):].head(span)
-    r_data_df = c_data_df.iloc[-span:]
+    data_df = c_data_df.iloc[-span:]
+    r_data_df= c_data_df.iloc[-span:]
+    r_data_df['Date'] = data_df['Date'] + datetime.timedelta(days=365)
+    r_data_df['Close'] = 0
 
     print("base data begin={:s}, end={:s}".format(str(data_df.iloc[0]['Date']), str(data_df.iloc[-1]['Date'])))
     close_val = data_df.iloc[-1]['Close']
@@ -141,7 +145,7 @@ def plot_corr(r_data_df, r1=20, r2=50, plot=False):
     return corr20.join(corr50, how="inner")
 
 
-def project_close_values(c_data_df, span=250):
+def project_close_values(c_data_df, fut_cls_df, span=250):
     print("data_df beg={:s}, data_df end={:s}".format(str(c_data_df.iloc[0]['Date']), str(c_data_df.iloc[-1]['Date'])))
     base_vals = []
     H3, c3, cls_data3, stddev3, slp3 = evaluate_HC(c_data_df, 3, span)
@@ -207,7 +211,7 @@ def project_close_values(c_data_df, span=250):
         topN = topN - 1
 
     r_data_df.set_index('Date', inplace=True)
-    prev_close_df = c_data_df.iloc[-(span * 2):].head(span)
+    prev_close_df = c_data_df.iloc[-span:]
     r_data_df_copy = r_data_df.copy()
     r_data_df_copy['Close'] = np.array(prev_close_df['Close']).tolist()
     cls_data = r_data_df_copy['Close'].tolist()
@@ -223,12 +227,16 @@ def project_close_values(c_data_df, span=250):
             sim_vals_dict[col].extend([cls_slope, cls_sim_slp, cls_std, sim_std])
 
     corr_results = plot_corr(r_data_df_copy, 20, 50)
+    np_arr = np.array(fut_cls_df['Close'])
+    np_arr = np_arr.append(np.array([len(r_data_df['Close'])-len(fut_cls_df['Close'])]))
+    r_data_df['Close'] = np_arr.tolist()
 
     for idx in corr_results.index.values:
         if idx not in 'Close':
             corr_20 = corr_results.at[idx, 'corr_20']
             corr_50 = corr_results.at[idx, 'corr_50']
             sim_vals_dict[idx].extend([corr_20, corr_50])
+
             perc_diff = abs((r_data_df.iloc[-1]['Close'] - r_data_df.iloc[-1][idx]) / r_data_df.iloc[-1]['Close'])
             if perc_diff < 0.03:
                 sim_vals_dict[idx].extend(['1'])
@@ -287,6 +295,7 @@ def prepare_simulation_data():
 def test_simulations():
 
     print('test_simulations...')
+    str_date = '11/29/2022'  # 22'
 
     with open('data/r_test.csv', 'w', newline='') as myfile:
         wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
@@ -299,9 +308,12 @@ def test_simulations():
         c_data_df['Date'] = pd.to_datetime(c_data_df.Date)
         c_data_df = c_data_df.sort_values('Date')
 
-        str_date = '04/03/2019'  # 22'
-        _data_df = c_data_df[c_data_df['Date'] < str_date]
-        base_vals, sim_vals_dict = project_close_values(_data_df)
+        _date_end = datetime.datetime.strptime(str_date, "%m/%d/%Y").date()
+        _date_end = _date_end - datetime.timedelta(days=365)
+        print(_date_end.strftime("%m/%d/%Y"))
+        _data_df = c_data_df[c_data_df['Date'] < _date_end.strftime("%m/%d/%Y")]
+        fut_cls_df = c_data_df[c_data_df['Date'] >= _date_end.strftime("%m/%d/%Y")].head(250)
+        base_vals, sim_vals_dict = project_close_values(_data_df, fut_cls_df)
 
         # rs_map[str_date] = results
         for key in sim_vals_dict:
@@ -321,11 +333,12 @@ def test_simulations():
 
     confidences = mlmodel.predict_nn(_data_df)
     r_data_df = load_data('r_data_df.csv')
+    close_val = r_data_df.iloc[-1]['Close']
+
     cols = r_data_df.columns.values
     i = 0
     for col in cols:
         if 'sim' in col:
-            close_val = r_data_df.iloc[-1]['Close']
             sim_val = r_data_df.iloc[-1][col]
             if confidences[i] < 0.55:
                 r_data_df.drop([col], axis=1, inplace=True)
