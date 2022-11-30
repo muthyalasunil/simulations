@@ -227,9 +227,10 @@ def project_close_values(c_data_df, fut_cls_df, span=250):
             sim_vals_dict[col].extend([cls_slope, cls_sim_slp, cls_std, sim_std])
 
     corr_results = plot_corr(r_data_df_copy, 20, 50)
-    np_arr = np.array(fut_cls_df['Close'])
-    np_arr = np_arr.append(np.array([len(r_data_df['Close'])-len(fut_cls_df['Close'])]))
-    r_data_df['Close'] = np_arr.tolist()
+    np_arr1 = np.array(fut_cls_df['Close'])
+    np_arr2 = np.array([len(r_data_df['Close'])-len(fut_cls_df['Close'])])
+    np_arr1 = np.append(np_arr1, np_arr2, axis=0)
+    r_data_df['Close'] = np_arr1.tolist()
 
     for idx in corr_results.index.values:
         if idx not in 'Close':
