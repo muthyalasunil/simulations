@@ -227,22 +227,23 @@ def project_close_values(c_data_df, fut_cls_df, span=250):
             sim_vals_dict[col].extend([cls_slope, cls_sim_slp, cls_std, sim_std])
 
     corr_results = plot_corr(r_data_df_copy, 20, 50)
-    np_arr1 = np.array(fut_cls_df['Close'])
-    np_arr2 = np.array([len(r_data_df['Close'])-len(fut_cls_df['Close'])])
-    np_arr1 = np.append(np_arr1, np_arr2, axis=0)
-    r_data_df['Close'] = np_arr1.tolist()
+
+    fut_cls_arr = fut_cls_df['Close'].to_numpy()
+    cls_list = r_data_df['Close'].tolist()
+    fut_cls_arr = np.append(fut_cls_arr, cls_list[len(fut_cls_arr):len(cls_list)], 0)
+    r_data_df['Close'] = fut_cls_arr.tolist()
 
     for idx in corr_results.index.values:
         if idx not in 'Close':
             corr_20 = corr_results.at[idx, 'corr_20']
             corr_50 = corr_results.at[idx, 'corr_50']
             sim_vals_dict[idx].extend([corr_20, corr_50])
-
-            perc_diff = abs((r_data_df.iloc[-1]['Close'] - r_data_df.iloc[-1][idx]) / r_data_df.iloc[-1]['Close'])
-            if perc_diff < 0.03:
-                sim_vals_dict[idx].extend(['1'])
-            else:
-                sim_vals_dict[idx].extend(['0'])
+            if r_data_df.iloc[-1]['Close'] > 0:
+                perc_diff = abs((r_data_df.iloc[-1]['Close'] - r_data_df.iloc[-1][idx]) / r_data_df.iloc[-1]['Close'])
+                if perc_diff < 0.03:
+                    sim_vals_dict[idx].extend(['1'])
+                else:
+                    sim_vals_dict[idx].extend(['0'])
 
     r_data_df.to_csv('data/r_data_df.csv', index=True)
     return base_vals, sim_vals_dict
