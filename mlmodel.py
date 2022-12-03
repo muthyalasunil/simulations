@@ -179,22 +179,17 @@ def larger_model():
 
 
 
-def predict_nn(data_df):
+def predict_nn(data_df, idxname):
     # load dataset
     # data_df = load_data('r_feature.csv')
-    arr_index = data_df.idxname.unique()
-    le = preprocessing.LabelEncoder()
-    le.fit(arr_index)
-    data_df['idxname'] = le.transform(data_df['idxname'])
-
     dataset = data_df.values
-    X = dataset[:, 0:32].astype(float)
-    Y = dataset[:, 32]
+    X = dataset[:, 0:31].astype(float)
+    Y = dataset[:, 31]
     print(X.shape)
     print(Y.shape)
 
     # load model
-    model = load_model('model.h5')
+    model = load_model(idxname+"_feature_model.h5")
     # summarize model.
     model.summary()
 
@@ -205,12 +200,6 @@ def predict_nn(data_df):
     confusion_matrix = pd.crosstab(Y, predictions, rownames=['Actual'], colnames=['Predicted'])
     print(confusion_matrix)
     return confidences
-
-
-if __name__ == '__main__':
-
-    data_df = load_data('r_test.csv')
-    predict_nn(data_df)
 
     # filename = 'r_feature.csv'
     # _data_df = load_data(filename)
@@ -240,22 +229,17 @@ if __name__ == '__main__':
     # print("Standardized: %.2f%% (%.2f%%)" % (results.mean()*100, results.std()*100))
 
 
-def build_save_nn(data_df):
-    # data_df = load_data('r_feature_l.csv')
-    arr_index = data_df.idxname.unique()
-    le = preprocessing.LabelEncoder()
-    le.fit(arr_index)
-    data_df['idxname'] = le.transform(data_df['idxname'])
-
+def build_save_nn(filename):
+    data_df = load_data(filename+'.csv')
     dataset = data_df.values
-    X = dataset[:, 0:32].astype(float)
-    Y = dataset[:, 32]
+    X = dataset[:, 0:31].astype(float)
+    Y = dataset[:, 31]
     print(X.shape)
     print(Y.shape)
     # define model
     model = Sequential()
-    model.add(Dense(96, input_dim=32, activation='relu'))
-    model.add(Dense(32, activation='relu'))
+    model.add(Dense(93, input_dim=31, activation='relu'))
+    model.add(Dense(31, activation='relu'))
     model.add(Dense(1, activation='sigmoid'))
     # compile model
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
@@ -266,28 +250,29 @@ def build_save_nn(data_df):
     scores = model.evaluate(X, Y)
     print("%s: %.2f%%" % (model.metrics_names[1], scores[1] * 100))
     # save model and architecture to single file
-    model.save("model.h5")
+    model.save(filename+"_model.h5")
     print("Saved model to disk")
 
 
-def evaluate_nn(data_df):
+def evaluate_nn(data_df, ffname):
     # load model
-    model = load_model('model.h5')
+    model = load_model(ffname+'_model.h5')
     # summarize model.
     model.summary()
     # load dataset
-    # data_df = load_data('r_feature.csv')
-    arr_index = data_df.idxname.unique()
-    le = preprocessing.LabelEncoder()
-    le.fit(arr_index)
-    data_df['idxname'] = le.transform(data_df['idxname'])
-
     dataset = data_df.values
-    X = dataset[:, 0:32].astype(float)
-    Y = dataset[:, 32]
+    X = dataset[:, 0:31].astype(float)
+    Y = dataset[:, 31]
     print(X.shape)
     print(Y.shape)
 
     # evaluate the model
     score = model.evaluate(X, Y, verbose=0)
     print("%s: %.2f%%" % (model.metrics_names[1], score[1] * 100))
+
+
+if __name__ == '__main__':
+    #build_save_nn('sp500_feature')
+    data_df = load_data('r_test.csv')
+    #evaluate_nn(data_df, 'sp500_feature')
+    predict_nn(data_df, 'sp500')

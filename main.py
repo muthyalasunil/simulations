@@ -97,7 +97,7 @@ def evaluate_HC(c_data_df, years, span):
 
 def project_forward(c_data_df, span):
     data_df = c_data_df.iloc[-span:]
-    r_data_df= c_data_df.iloc[-span:]
+    r_data_df = c_data_df.iloc[-span:]
     r_data_df['Date'] = data_df['Date'] + datetime.timedelta(days=365)
     r_data_df['Close'] = 0
 
@@ -108,7 +108,7 @@ def project_forward(c_data_df, span):
     c_data_df['diff'] = c_data_df['Close'].diff()
     c_data_df['trend'] = np.where(c_data_df['diff'] > 0, 1, 0)
 
-    value_list = data_df['Close'].diff().tolist()  # c_data_df['diff'].tolist()
+    value_list = c_data_df['diff'].tolist()#data_df['Close'].diff().tolist()
     value_list = [0 if math.isnan(x) else x for x in value_list]
     value_list = set(value_list)
     # convert the set to the list
@@ -145,7 +145,7 @@ def plot_corr(r_data_df, r1=20, r2=50, plot=False):
     return corr20.join(corr50, how="inner")
 
 
-def project_close_values(c_data_df, fut_cls_df, span=250):
+def project_close_values(c_data_df, fut_cls_df, span=250, topN = 25):
     print("data_df beg={:s}, data_df end={:s}".format(str(c_data_df.iloc[0]['Date']), str(c_data_df.iloc[-1]['Date'])))
     base_vals = []
     H3, c3, cls_data3, stddev3, slp3 = evaluate_HC(c_data_df, 3, span)
@@ -203,7 +203,6 @@ def project_close_values(c_data_df, fut_cls_df, span=250):
                                      abs(slp10 - cls_slp10)])
 
     simHmap = dict(sorted(simHmap.items(), key=lambda item: item[1]))
-    topN = 25
     for key in simHmap:
         if topN < 0:
             r_data_df.drop([key], axis=1, inplace=True)
@@ -238,72 +237,75 @@ def project_close_values(c_data_df, fut_cls_df, span=250):
             corr_20 = corr_results.at[idx, 'corr_20']
             corr_50 = corr_results.at[idx, 'corr_50']
             sim_vals_dict[idx].extend([corr_20, corr_50])
+            flag = 0
             if r_data_df.iloc[-1]['Close'] > 0:
                 perc_diff = abs((r_data_df.iloc[-1]['Close'] - r_data_df.iloc[-1][idx]) / r_data_df.iloc[-1]['Close'])
                 if perc_diff < 0.03:
-                    sim_vals_dict[idx].extend(['1'])
-                else:
-                    sim_vals_dict[idx].extend(['0'])
+                    flag = 1
+            sim_vals_dict[idx].extend([flag])
 
     r_data_df.to_csv('data/r_data_df.csv', index=True)
     return base_vals, sim_vals_dict
 
 
-files = ['sp500', 'sp400', 'sp100', 'sp1000', 'spbse100', 'nifty50']
-base_cols = ['idxname', 'h3', 'h5', 'h7', 'h10', 'std3', 'std5', 'std7', 'std10', 'slp3', 'slp5', 'slp7', 'slp10',
+INDEX_FILES = ['sp500', 'sp400', 'sp100', 'sp1000', 'spbse100']
+BASE_COLS = ['h3', 'h5', 'h7', 'h10', 'std3', 'std5', 'std7', 'std10', 'slp3', 'slp5', 'slp7', 'slp10',
              'thresh']
 
-sim_cols = ['simH3', 'sim_std3', 'sim_slp3', 'simH5', 'sim_std5', 'sim_slp5', 'simH7', 'sim_std7', 'sim_slp7',
+SIM_COLS = ['simH3', 'sim_std3', 'sim_slp3', 'simH5', 'sim_std5', 'sim_slp5', 'simH7', 'sim_std7', 'sim_slp7',
             'simH10', 'sim_std10', 'sim_slp10', 'cls_slope', 'cls_sim_slp', 'cls_std', 'sim_std',
             'corr_20', 'corr_50', 'flag']
-base_cols.extend(sim_cols)
+BASE_COLS.extend(SIM_COLS)
+DATE_VAL = ['03', '07', '11', '16', '20', '25', '29']
+MONTH_VAL = ['01', '03', '05', '07', '09', '12', '06']
 
 
-def prepare_simulation_data():
-    print('prepare_simulation_data...')
+def prepare_simulation_data(idxname):
+    print(idxname+' prepare_simulation_data...')
 
-    with open('data/r_feature.csv', 'w', newline='') as myfile:
+    with open('data/'+idxname+'_feature.csv', 'w', newline='') as myfile:
         wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
-        wr.writerow(base_cols)
+        wr.writerow(BASE_COLS)
 
-        for idxfile in files:
+        c_data_df = load_data(idxname + '.csv')
+        c_data_df.rename(columns=lambda x: x.strip(), inplace=True)
+        c_data_df.drop(['Open', 'High', 'Low'], axis=1, inplace=True)
 
-            c_data_df = load_data(idxfile + '.csv')
-            c_data_df.rename(columns=lambda x: x.strip(), inplace=True)
-            c_data_df.drop(['Open', 'High', 'Low'], axis=1, inplace=True)
+        c_data_df['Date'] = pd.to_datetime(c_data_df.Date)
+        c_data_df = c_data_df.sort_values('Date')
 
-            c_data_df['Date'] = pd.to_datetime(c_data_df.Date)
-            c_data_df = c_data_df.sort_values('Date')
-            rs_map = {}
+        y = 1
+        for m in range(12):
+            str_date = "{:02d}".format(m + 1)
+            str_date = str_date + '/' + "{:02d}".format(m * 2 + 1)
+            str_date = str_date + '/' + str(2016 + y % 6)
+            y += 1
 
-            for i in range(6):
-                str_date = '10/07/20'  # 22'
-                str_date = str_date + str(15 + i)
-                print(idxfile + ':' + str_date)
-                _data_df = c_data_df[c_data_df['Date'] < str_date]
-                base_vals, sim_vals_dict = project_close_values(_data_df)
+            print(idxname + ':' + str_date)
+            _date_end = datetime.datetime.strptime(str_date, "%m/%d/%Y").date()
+            _date_end = _date_end - datetime.timedelta(days=365)
+            print(_date_end.strftime("%m/%d/%Y"))
+            _data_df = c_data_df[c_data_df['Date'] < _date_end.strftime("%m/%d/%Y")]
+            fut_cls_df = c_data_df[c_data_df['Date'] >= _date_end.strftime("%m/%d/%Y")].head(250)
+            base_vals, sim_vals_dict = project_close_values(_data_df, fut_cls_df, topN=500)
 
-                # rs_map[str_date] = results
-                for key in sim_vals_dict:
-                    line_arr = [idxfile]
-                    line_arr.extend(base_vals)
-                    line_arr.extend(sim_vals_dict[key])
-                    wr.writerow(line_arr)
-            print(idxfile + ' completed')
+            for key in sim_vals_dict:
+                line_arr = []
+                line_arr.extend(base_vals)
+                line_arr.extend(sim_vals_dict[key])
+                wr.writerow(line_arr)
+        print(idxname + ' features completed')
 
         myfile.close()
 
 
-def test_simulations():
-
-    print('test_simulations...')
-    str_date = '11/29/2022'  # 22'
-
-    with open('data/r_test.csv', 'w', newline='') as myfile:
+def test_simulations(idxname, str_date):
+    print('test_simulations...'+idxname)
+    test_file = idxname+'_test.csv'
+    with open('data/'+test_file, 'w', newline='') as myfile:
         wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
-        wr.writerow(base_cols)
-        index_name = 'sp500'
-        c_data_df = load_data(index_name+'.csv')
+        wr.writerow(BASE_COLS)
+        c_data_df = load_data(idxname + '.csv')
         c_data_df.rename(columns=lambda x: x.strip(), inplace=True)
         c_data_df.drop(['Open', 'High', 'Low'], axis=1, inplace=True)
 
@@ -315,11 +317,11 @@ def test_simulations():
         print(_date_end.strftime("%m/%d/%Y"))
         _data_df = c_data_df[c_data_df['Date'] < _date_end.strftime("%m/%d/%Y")]
         fut_cls_df = c_data_df[c_data_df['Date'] >= _date_end.strftime("%m/%d/%Y")].head(250)
-        base_vals, sim_vals_dict = project_close_values(_data_df, fut_cls_df)
+        base_vals, sim_vals_dict = project_close_values(_data_df, fut_cls_df, topN=200)
 
         # rs_map[str_date] = results
         for key in sim_vals_dict:
-            line_arr = [index_name]
+            line_arr = []
             line_arr.extend(base_vals)
             line_arr.extend(sim_vals_dict[key])
             wr.writerow(line_arr)
@@ -327,32 +329,40 @@ def test_simulations():
 
         myfile.close()
 
-    filename = 'r_test.csv'
-    _data_df = load_data(filename)
+    _data_df = load_data(test_file)
     print(_data_df.shape)
     dataset = _data_df.values
-    Y = dataset[:, 32]
+    Y = dataset[:, 31]
 
-    confidences = mlmodel.predict_nn(_data_df)
+    confidences = mlmodel.predict_nn(_data_df, idxname)
+    _data_df['confidence'] = confidences
     r_data_df = load_data('r_data_df.csv')
     close_val = r_data_df.iloc[-1]['Close']
 
     cols = r_data_df.columns.values
+    str_format = "sim={:s}, actual={:s} pred={:s} perc_diff={:f}"
     i = 0
+    max_conf = max(confidences)
     for col in cols:
         if 'sim' in col:
             sim_val = r_data_df.iloc[-1][col]
-            if confidences[i] < 0.55:
+            if confidences[i] < 0.55 and confidences[i] < max_conf:
                 r_data_df.drop([col], axis=1, inplace=True)
-            print("sim={:s}, actual={:s} pred={:s} close={:f} simcls={:f}".format(col, str(Y[i]), str(confidences[i]), close_val, sim_val))
-            i = i+1
+            else:
+                print(str_format.format(col, str(Y[i]), str(confidences[i]), (close_val - sim_val)/close_val))
+            i = i + 1
 
-    r_data_df.to_csv('data/nn_data_df.csv', index=False)
+    r_data_df.to_csv('data/nn_'+test_file, index=False)
+    _data_df.to_csv('data/'+test_file, index=False)
 
 
 if __name__ == '__main__':
+    str_date = '03/15/2018'  # 22'
 
-    test_simulations()
+    for idxname in INDEX_FILES:
+        #prepare_simulation_data(idxname)
+        #mlmodel.build_save_nn(idxname+'_feature')
+        test_simulations(idxname, str_date)
 
     '''
     r_data_df.set_index('Date', inplace=True)
