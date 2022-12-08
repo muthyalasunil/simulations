@@ -57,7 +57,7 @@ def run_simuation(simulations, iterations, threshold, value_list, r_data_df, clo
 
 
 def run_simuations(simulations, iterations, threshold, value_list, r_data_df, close_val):
-    # print(simulations, iterations, threshold)
+    print("simulations={:s}, iterations={:s}, threshold={:s}".format(str(simulations), str(iterations), str(threshold)))
     sim_results = []
     for sim in range(simulations):
         index_values = []
@@ -67,7 +67,7 @@ def run_simuations(simulations, iterations, threshold, value_list, r_data_df, cl
             if math.isnan(random_num):
                 random_num = 0
             else:
-                number = int(np.random.uniform() * 100)  # get a random number to see who wins
+                number = np.random.uniform() * 100  # get a random number to see who wins
                 if number > threshold:
                     random_num = -random_num
             index_values.append(random_num)
@@ -79,7 +79,7 @@ def run_simuations(simulations, iterations, threshold, value_list, r_data_df, cl
         r_data_df[col_name] = index_list
         r_data_df[col_name] = r_data_df[col_name].cumsum()
         r_data_df[col_name] = r_data_df[col_name] + close_val
-        simH, simC, data = compute_Hc(r_data_df[col_name].tolist(), kind='price', simplified=True)
+        # simH, simC, data = compute_Hc(r_data_df[col_name].tolist(), kind='price', simplified=True)
         # print("simH={:.4f}, simC={:.4f} col_name={:s}".format(simH, simC, col_name))
         i += 1
     return r_data_df
@@ -96,25 +96,26 @@ def evaluate_HC(c_data_df, years, span):
 
 
 def project_forward(c_data_df, span):
-    data_df = c_data_df.iloc[-span:]
+    data_df = c_data_df.iloc[-(span * 3):]
+
     r_data_df = c_data_df.iloc[-span:]
-    r_data_df['Date'] = data_df['Date'] + datetime.timedelta(days=365)
+    r_data_df['Date'] = r_data_df['Date'] + datetime.timedelta(days=365)
     r_data_df['Close'] = 0
 
-    print("base data begin={:s}, end={:s}".format(str(data_df.iloc[0]['Date']), str(data_df.iloc[-1]['Date'])))
+    print("value list data begin={:s}, end={:s}".format(str(data_df.iloc[0]['Date']), str(data_df.iloc[-1]['Date'])))
     close_val = data_df.iloc[-1]['Close']
     print("last Close={:.4f}".format(close_val))
 
     c_data_df['diff'] = c_data_df['Close'].diff()
     c_data_df['trend'] = np.where(c_data_df['diff'] > 0, 1, 0)
+    threshold = c_data_df['trend'].sum() / c_data_df['trend'].count() * 100
 
-    value_list = c_data_df['diff'].tolist()#data_df['Close'].diff().tolist()
+    value_list = data_df['Close'].diff().tolist()
     value_list = [0 if math.isnan(x) else x for x in value_list]
     value_list = set(value_list)
     # convert the set to the list
     value_list = (list(value_list))
 
-    threshold = int(c_data_df['trend'].sum() / c_data_df['trend'].count() * 100)
     iterations = r_data_df['Close'].count()
     ret_data_df = run_simuations(1000, iterations, threshold, value_list, r_data_df, close_val)
     return threshold, ret_data_df
@@ -145,7 +146,25 @@ def plot_corr(r_data_df, r1=20, r2=50, plot=False):
     return corr20.join(corr50, how="inner")
 
 
-def project_close_values(c_data_df, fut_cls_df, span=250, topN = 25):
+def calculate_trends(c_data_df, col_name='Close'):
+    cls_val_final = c_data_df.iloc[-1][col_name]
+    _data_df_1m = c_data_df.iloc[-30:]
+    close_val_1m = _data_df_1m.iloc[1][col_name]
+    _data_df_3m = c_data_df.iloc[-60:]
+    close_val_3m = _data_df_3m.iloc[1][col_name]
+    _data_df_6m = c_data_df.iloc[-120:]
+    close_val_6m = _data_df_6m.iloc[1][col_name]
+    _data_df_9m = c_data_df.iloc[-180:]
+    close_val_9m = _data_df_9m.iloc[1][col_name]
+    _data_df_12m = c_data_df.iloc[-240:]
+    close_val_12m = _data_df_12m.iloc[1][col_name]
+
+    return (cls_val_final - close_val_1m) / close_val_1m, (cls_val_final - close_val_3m) / close_val_3m, (
+                cls_val_final - close_val_6m) / close_val_6m, (cls_val_final - close_val_9m) / close_val_9m, (
+                       cls_val_final - close_val_12m) / close_val_12m
+
+
+def project_close_values(c_data_df, fut_cls_df, span=250, topN=25):
     print("data_df beg={:s}, data_df end={:s}".format(str(c_data_df.iloc[0]['Date']), str(c_data_df.iloc[-1]['Date'])))
     base_vals = []
     H3, c3, cls_data3, stddev3, slp3 = evaluate_HC(c_data_df, 3, span)
@@ -156,6 +175,8 @@ def project_close_values(c_data_df, fut_cls_df, span=250, topN = 25):
     base_vals.extend([H3, H5, H7, H10])
     base_vals.extend([stddev3, stddev5, stddev7, stddev10])
     base_vals.extend([slp3, slp5, slp7, slp10])
+    trnd_1, trnd_3, trnd_6, trnd_9, trnd_12 = calculate_trends(c_data_df)
+    base_vals.extend([trnd_1, trnd_3, trnd_6, trnd_9, trnd_12])
 
     threshold, r_data_df = project_forward(c_data_df, span)
     base_vals.extend([threshold / 100])
@@ -217,6 +238,11 @@ def project_close_values(c_data_df, fut_cls_df, span=250, topN = 25):
     cls_slope, inter, r_val, p_val, std_err = stats.linregress(range(len(cls_data)), cls_data)
     cls_std = statistics.stdev(r_data_df_copy['Close'].tolist())
 
+    fut_cls_arr = fut_cls_df['Close'].to_numpy()
+    cls_list = r_data_df['Close'].tolist()
+    fut_cls_arr = np.append(fut_cls_arr, cls_list[len(fut_cls_arr):len(cls_list)], 0)
+    r_data_df['Close'] = fut_cls_arr.tolist()
+
     cols = r_data_df_copy.columns.values
     for col in cols:
         if col not in 'Close':
@@ -224,46 +250,53 @@ def project_close_values(c_data_df, fut_cls_df, span=250, topN = 25):
             sim_std = statistics.stdev(sim_data)
             cls_sim_slp, inter, r_val, p_val, std_err = stats.linregress(range(len(sim_data)), sim_data)
             sim_vals_dict[col].extend([cls_slope, cls_sim_slp, cls_std, sim_std])
+            strnd_1, strnd_3, strnd_6, strnd_9, strnd_12 = calculate_trends(r_data_df_copy, col)
+            sim_vals_dict[col].extend([strnd_1, strnd_3, strnd_6, strnd_9, strnd_12])
 
+            flag = 0
+            if r_data_df.iloc[-1]['Close'] > 0:
+                perc_diff = abs((r_data_df.iloc[-1]['Close'] - r_data_df.iloc[-1][col]) / r_data_df.iloc[-1]['Close'])
+                if perc_diff < 0.03:
+                    flag = 1
+            sim_vals_dict[col].extend([flag])
+
+    '''
     corr_results = plot_corr(r_data_df_copy, 20, 50)
-
-    fut_cls_arr = fut_cls_df['Close'].to_numpy()
-    cls_list = r_data_df['Close'].tolist()
-    fut_cls_arr = np.append(fut_cls_arr, cls_list[len(fut_cls_arr):len(cls_list)], 0)
-    r_data_df['Close'] = fut_cls_arr.tolist()
-
     for idx in corr_results.index.values:
         if idx not in 'Close':
             corr_20 = corr_results.at[idx, 'corr_20']
             corr_50 = corr_results.at[idx, 'corr_50']
-            sim_vals_dict[idx].extend([corr_20, corr_50])
+            #sim_vals_dict[idx].extend([corr_20, corr_50])
             flag = 0
             if r_data_df.iloc[-1]['Close'] > 0:
                 perc_diff = abs((r_data_df.iloc[-1]['Close'] - r_data_df.iloc[-1][idx]) / r_data_df.iloc[-1]['Close'])
                 if perc_diff < 0.03:
                     flag = 1
             sim_vals_dict[idx].extend([flag])
+    '''
 
     r_data_df.to_csv('data/r_data_df.csv', index=True)
     return base_vals, sim_vals_dict
 
 
-INDEX_FILES = ['sp500', 'sp400', 'sp100', 'sp1000', 'spbse100']
+INDEX_FILES = ['sp500']  # , 'sp400', 'sp100', 'sp1000', 'spbse100']
 BASE_COLS = ['h3', 'h5', 'h7', 'h10', 'std3', 'std5', 'std7', 'std10', 'slp3', 'slp5', 'slp7', 'slp10',
-             'thresh']
+             'trnd_1', 'trnd_3', 'trnd_6', 'trnd_9', 'trnd_12', 'thresh']
 
 SIM_COLS = ['simH3', 'sim_std3', 'sim_slp3', 'simH5', 'sim_std5', 'sim_slp5', 'simH7', 'sim_std7', 'sim_slp7',
             'simH10', 'sim_std10', 'sim_slp10', 'cls_slope', 'cls_sim_slp', 'cls_std', 'sim_std',
-            'corr_20', 'corr_50', 'flag']
+            'strnd_1', 'strnd_3', 'strnd_6', 'strnd_9', 'strnd_12', 'flag']
+
+# 'corr_20', 'corr_50',
 BASE_COLS.extend(SIM_COLS)
 DATE_VAL = ['03', '07', '11', '16', '20', '25', '29']
 MONTH_VAL = ['01', '03', '05', '07', '09', '12', '06']
 
 
 def prepare_simulation_data(idxname):
-    print(idxname+' prepare_simulation_data...')
+    print(idxname + ' prepare_simulation_data...')
 
-    with open('data/'+idxname+'_feature.csv', 'w', newline='') as myfile:
+    with open('data/' + idxname + '_feature.csv', 'w', newline='') as myfile:
         wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
         wr.writerow(BASE_COLS)
 
@@ -287,7 +320,7 @@ def prepare_simulation_data(idxname):
             print(_date_end.strftime("%m/%d/%Y"))
             _data_df = c_data_df[c_data_df['Date'] < _date_end.strftime("%m/%d/%Y")]
             fut_cls_df = c_data_df[c_data_df['Date'] >= _date_end.strftime("%m/%d/%Y")].head(250)
-            base_vals, sim_vals_dict = project_close_values(_data_df, fut_cls_df, topN=500)
+            base_vals, sim_vals_dict = project_close_values(_data_df, fut_cls_df, topN=1000)
 
             for key in sim_vals_dict:
                 line_arr = []
@@ -300,9 +333,9 @@ def prepare_simulation_data(idxname):
 
 
 def test_simulations(idxname, str_date):
-    print('test_simulations...'+idxname)
-    test_file = idxname+'_test.csv'
-    with open('data/'+test_file, 'w', newline='') as myfile:
+    print('test_simulations...' + idxname)
+    test_file = idxname + '_test.csv'
+    with open('data/' + test_file, 'w', newline='') as myfile:
         wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
         wr.writerow(BASE_COLS)
         c_data_df = load_data(idxname + '.csv')
@@ -332,7 +365,7 @@ def test_simulations(idxname, str_date):
     _data_df = load_data(test_file)
     print(_data_df.shape)
     dataset = _data_df.values
-    Y = dataset[:, 31]
+    Y = dataset[:, len(_data_df.columns) - 1]
 
     confidences = mlmodel.predict_nn(_data_df, idxname)
     _data_df['confidence'] = confidences
@@ -343,26 +376,29 @@ def test_simulations(idxname, str_date):
     str_format = "sim={:s}, actual={:s} pred={:s} perc_diff={:f}"
     i = 0
     max_conf = max(confidences)
+    sel_cols = []
     for col in cols:
         if 'sim' in col:
             sim_val = r_data_df.iloc[-1][col]
-            if confidences[i] < 0.55 and confidences[i] < max_conf:
+            if confidences[i] < max_conf:  # confidences[i] < 0.55 and
                 r_data_df.drop([col], axis=1, inplace=True)
             else:
-                print(str_format.format(col, str(Y[i]), str(confidences[i]), (close_val - sim_val)/close_val))
+                sel_cols.extend([col])
+                print(str_format.format(col, str(Y[i]), str(confidences[i]), (close_val - sim_val) / close_val))
             i = i + 1
 
-    r_data_df.to_csv('data/nn_'+test_file, index=False)
-    _data_df.to_csv('data/'+test_file, index=False)
+    r_data_df['mean'] = r_data_df[sel_cols].mean(axis=1)
+    r_data_df.to_csv('data/nn_' + test_file, index=False)
+    _data_df.to_csv('data/' + test_file, index=False)
 
 
 if __name__ == '__main__':
-    str_date = '03/15/2018'  # 22'
+    str_date = '06/15/2019'  # 22'
 
     for idxname in INDEX_FILES:
-        #prepare_simulation_data(idxname)
-        #mlmodel.build_save_nn(idxname+'_feature')
-        test_simulations(idxname, str_date)
+        prepare_simulation_data(idxname)
+        mlmodel.build_save_nn(idxname+'_feature')
+        #test_simulations(idxname, str_date)
 
     '''
     r_data_df.set_index('Date', inplace=True)

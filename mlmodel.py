@@ -183,22 +183,20 @@ def predict_nn(data_df, idxname):
     # load dataset
     # data_df = load_data('r_feature.csv')
     dataset = data_df.values
-    X = dataset[:, 0:31].astype(float)
-    Y = dataset[:, 31]
-    print(X.shape)
-    print(Y.shape)
+    X = dataset[:, 0:len(data_df.columns) - 1].astype(float)
+    Y = dataset[:, len(data_df.columns) - 1]
 
     # load model
     model = load_model(idxname+"_feature_model.h5")
     # summarize model.
-    model.summary()
+    #model.summary()
 
     # make class predictions with the model
     confidences = model.predict(X)
     predictions = np.concatenate((confidences > 0.6).astype(int), axis=0)
     print("rf Predicted:", metrics.accuracy_score(Y, predictions))
     confusion_matrix = pd.crosstab(Y, predictions, rownames=['Actual'], colnames=['Predicted'])
-    print(confusion_matrix)
+    #print(confusion_matrix)
     return confidences
 
     # filename = 'r_feature.csv'
@@ -231,15 +229,16 @@ def predict_nn(data_df, idxname):
 
 def build_save_nn(filename):
     data_df = load_data(filename+'.csv')
+    col_len = len(data_df.columns)
     dataset = data_df.values
-    X = dataset[:, 0:31].astype(float)
-    Y = dataset[:, 31]
+    X = dataset[:, 0:(col_len-1)].astype(float)
+    Y = dataset[:, col_len-1]
     print(X.shape)
     print(Y.shape)
     # define model
     model = Sequential()
-    model.add(Dense(93, input_dim=31, activation='relu'))
-    model.add(Dense(31, activation='relu'))
+    model.add(Dense((col_len-1) * 3, input_dim=(col_len-1), activation='relu'))
+    model.add(Dense((col_len-1), activation='relu'))
     model.add(Dense(1, activation='sigmoid'))
     # compile model
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
