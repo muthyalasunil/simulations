@@ -59,7 +59,7 @@ def run_simuation(simulations, iterations, threshold, value_list, r_data_df, clo
     return r_data_df
 
 
-def run_simuations(simulations, iterations, threshold, value_list_array, r_data_df, close_val):
+def run_simulations(simulations, iterations, threshold, value_list_array, r_data_df, close_val):
     logging.info(
         "simulations={:s}, iterations={:s}, threshold={:s}".format(str(simulations), str(iterations), str(threshold)))
     sim_results = []
@@ -123,7 +123,7 @@ def project_forward(c_data_df, span):
         value_list_array.append(list(value_list))
 
     iterations = r_data_df['Close'].count()
-    ret_data_df = run_simuations(1000, iterations, threshold, value_list_array, r_data_df, close_val)
+    ret_data_df = run_simulations(1000, iterations, threshold, value_list_array, r_data_df, close_val)
     return threshold, ret_data_df
 
 
@@ -205,7 +205,7 @@ def project_close_values(c_data_df, fut_cls_df, idxname, span=250, topN=250):
     simHmap = {}
 
     for i in range(1000):
-        sim_vals_list = []
+        sim_vals_list = [i % 3] #sim values from which year
         col_name = 'sim' + str(i + 1)
         sim_list = r_data_df[col_name].tolist()
         ##print('processing features for simulation:' + col_name)
@@ -241,7 +241,9 @@ def project_close_values(c_data_df, fut_cls_df, idxname, span=250, topN=250):
         simHmap[col_name] = np.mean([abs(H3 - simH3), abs(H5 - simH5), abs(H7 - simH7), abs(H10 - simH10),
                                      abs(slp3 - cls_slp3), abs(slp5 - cls_slp5), abs(slp7 - cls_slp7),
                                      abs(slp10 - cls_slp10)])
-        sim_vals_list.extend([simHmap[col_name]])  # adding abs diff into features
+        mean_h = np.mean([H3 - simH3, H5 - simH5, H7 - simH7, H10 - simH10])
+        mean_slp = np.mean([slp3 - cls_slp3, slp5 - cls_slp5, slp7 - cls_slp7, slp10 - cls_slp10])
+        sim_vals_list.extend([mean_h, mean_slp])
         sim_vals_dict[col_name] = sim_vals_list
 
     simHmap = dict(sorted(simHmap.items(), key=lambda item: item[1]))
@@ -307,8 +309,8 @@ INDEX_FILES = ['sp500', 'sp400', 'sp100', 'sp1000', 'spbse100']
 BASE_COLS = ['h3', 'h5', 'h7', 'h10', 'std3', 'std5', 'std7', 'std10', 'slp3', 'slp5', 'slp7', 'slp10',
              'trnd_slp', 'sma_slp', 'thresh']
 
-SIM_COLS = ['simH3', 'sim_std3', 'sim_slp3', 'simH5', 'sim_std5', 'sim_slp5', 'simH7', 'sim_std7', 'sim_slp7',
-            'simH10', 'sim_std10', 'sim_slp10', 'abs_diff', 'cls_slope', 'cls_sim_slp', 'cls_std', 'sim_std',
+SIM_COLS = ['val_yr','simH3', 'sim_std3', 'sim_slp3', 'simH5', 'sim_std5', 'sim_slp5', 'simH7', 'sim_std7', 'sim_slp7',
+            'simH10', 'sim_std10', 'sim_slp10', 'h_diff', 'slp_diff', 'cls_slope', 'cls_sim_slp', 'cls_std', 'sim_std',
             'strnd_slp', 'sim_slp', 'flag']
 
 # 'corr_20', 'corr_50',
@@ -421,7 +423,7 @@ def build_model(idxname):
     mlmodel.build_save_nn(idxname + '_feature')
 
 
-if __name__ == '__main__':
+if __name__ == '__main1__':
     str_date = '06/28/2020'  # 22'
 
     for idxname in INDEX_FILES:
@@ -468,12 +470,12 @@ def thread_function(name):
     logging.info("Thread %s: finishing", name)
 
 
-if __name__ == "__maint__":
+if __name__ == "__main__":
     format = "%(asctime)s: %(message)s"
     logging.basicConfig(format=format, level=logging.INFO,
                         datefmt="%H:%M:%S")
 
-    str_date = '04/30/2022'  # 22'
+    str_date = '04/30/2021'  # 22'
 
     for idxname in INDEX_FILES:
         logging.info("Main    : before creating thread")
