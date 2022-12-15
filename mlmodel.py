@@ -25,7 +25,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 
 DATA_FOLDER = 'data'
+import warnings
 
+warnings.filterwarnings("ignore")
 
 def load_data(filename):
     _data_df = pd.read_csv(DATA_FOLDER + '\\' + filename)
