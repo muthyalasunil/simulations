@@ -114,8 +114,11 @@ def project_forward(c_data_df, span):
     threshold = c_data_df['trend'].sum() / c_data_df['trend'].count() * 100
 
     value_list_array = []
-    for iyear in range(3):
-        data_df = c_data_df.iloc[-(span * iyear):].head(span)
+    for iyear in [1,2,3]:
+        lastdate = c_data_df.iloc[-1]['Date']
+        _date_end = lastdate - datetime.timedelta(days=(365*iyear))
+        data_df = c_data_df[c_data_df['Date'] < _date_end.strftime("%m/%d/%Y")].tail(250)
+
         value_list = data_df['Close'].diff().tolist()
         value_list = [0 if math.isnan(x) else x for x in value_list]
         value_list = set(value_list)
@@ -184,7 +187,7 @@ def calculate_trends_slope(c_data_df, col_name='Close'):
 
 
 def project_close_values(c_data_df, fut_cls_df, idxname, span=250, topN=250):
-    # print("data_df beg={:s}, data_df end={:s}".format(str(c_data_df.iloc[0]['Date']), str(c_data_df.iloc[-1]['Date'])))
+    print("data_df beg={:s}, data_df end={:s}".format(str(c_data_df.iloc[0]['Date']), str(c_data_df.iloc[-1]['Date'])))
     base_vals = []
     H3, c3, cls_data3, stddev3, slp3 = evaluate_HC(c_data_df, 3, span)
     H5, c5, cls_data5, stddev5, slp5 = evaluate_HC(c_data_df, 5, span)
@@ -318,7 +321,7 @@ BASE_COLS.extend(SIM_COLS)
 DATE_VAL = ['03/31', '06/30', '09/30', '12/31']
 
 
-def prepare_simulation_data(idxname):
+def prepare_simulation_data(idxname, topN=250):
     print(idxname + ' prepare_simulation_data...')
 
     with open('data/' + idxname + '_feature.csv', 'w', newline='') as myfile:
@@ -343,7 +346,7 @@ def prepare_simulation_data(idxname):
                 fut_cls_df = c_data_df[c_data_df['Date'] >= _date_end.strftime("%m/%d/%Y")].head(250)
 
                 try:
-                    base_vals, sim_vals_dict = project_close_values(_data_df, fut_cls_df, idxname, topN=250)
+                    base_vals, sim_vals_dict = project_close_values(_data_df, fut_cls_df, idxname, topN)
 
                     for key in sim_vals_dict:
                         line_arr = []
@@ -409,7 +412,7 @@ def test_simulations(idxname, str_date, topN=250):
                 r_data_df.drop([col], axis=1, inplace=True)
             else:
                 sel_cols.extend([col])
-                logging.info(
+                print(
                     str_format.format(idxname, col, str(Y[i]), str(confidences[i]), (close_val - sim_val) / close_val))
             i = i + 1
 
@@ -418,16 +421,16 @@ def test_simulations(idxname, str_date, topN=250):
     _data_df.to_csv('data/' + test_file, index=False)
 
 
-def build_model(idxname):
-    prepare_simulation_data(idxname)
+def prepare_build_model(idxname, topN=250):
+    prepare_simulation_data(idxname, topN)
     mlmodel.build_save_nn(idxname + '_feature')
 
 
-if __name__ == '__main1__':
+if __name__ == '__main__':
     str_date = '06/28/2020'  # 22'
 
     for idxname in INDEX_FILES:
-        prepare_simulation_data(idxname)
+        prepare_simulation_data(idxname, 500)
         mlmodel.build_save_nn(idxname + '_feature')
         #test_simulations(idxname, str_date, 100)
         '''
@@ -470,16 +473,16 @@ def thread_function(name):
     logging.info("Thread %s: finishing", name)
 
 
-if __name__ == "__main__":
+if __name__ == "__maint__":
     format = "%(asctime)s: %(message)s"
     logging.basicConfig(format=format, level=logging.INFO,
                         datefmt="%H:%M:%S")
 
-    str_date = '04/30/2021'  # 22'
+    str_date = '06/30/2021'  # 22'
 
     for idxname in INDEX_FILES:
         logging.info("Main    : before creating thread")
-        x = threading.Thread(target=test_simulations, args=(idxname, str_date, 100))
+        x = threading.Thread(target=test_simulations, args=(idxname, str_date, 250))
         logging.info("Main    : before running thread")
         x.start()
         logging.info("Main    : wait for the thread to finish")
