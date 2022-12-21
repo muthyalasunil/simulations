@@ -113,7 +113,7 @@ def project_forward(e_data_df, span, simulations):
     threshold = e_data_df['trend'].sum() / e_data_df['trend'].count() * 100
 
     value_list_array = []
-    for iyear in [1, 2]:
+    for iyear in range(3):
         lastdate = e_data_df.iloc[-1]['Date']
         _date_end = lastdate - datetime.timedelta(days=(365 * iyear))
         data_df = e_data_df[e_data_df['Date'] < _date_end.strftime("%m/%d/%Y")].tail(250)
@@ -423,7 +423,7 @@ def test_simulations(idxname, tgt_date, topN=250):
 
 
 if __name__ == '__main__':
-    str_dates = ['12/30/2022']
+    str_dates = ['10/30/2021']
 
     for idxname in INDEX_FILES:
         #prepare_simulation_data(idxname, 1000)
