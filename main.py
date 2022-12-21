@@ -60,8 +60,7 @@ def run_simuation(simulations, iterations, threshold, value_list, r_data_df, clo
 
 
 def run_simulations(simulations, iterations, threshold, value_list_array, r_data_df, close_val):
-    print(
-        "simulations={:s}, iterations={:s}, threshold={:s}".format(str(simulations), str(iterations), str(threshold)))
+    #print("simulations={:s}, iterations={:s}, threshold={:s}".format(str(simulations), str(iterations), str(threshold)))
     sim_results = []
     mod_denom = len(value_list_array)
     for sim in range(simulations):
@@ -114,7 +113,7 @@ def project_forward(e_data_df, span, simulations):
     threshold = e_data_df['trend'].sum() / e_data_df['trend'].count() * 100
 
     value_list_array = []
-    for iyear in [1, 2, 3]:
+    for iyear in [1, 2]:
         lastdate = e_data_df.iloc[-1]['Date']
         _date_end = lastdate - datetime.timedelta(days=(365 * iyear))
         data_df = e_data_df[e_data_df['Date'] < _date_end.strftime("%m/%d/%Y")].tail(250)
@@ -334,12 +333,15 @@ def prepare_simulation_data(idxname, topN=250, years=5):
                 print(idxname + ':' + tgt_date)
                 tgt_date = datetime.datetime.strptime(tgt_date, "%m/%d/%Y").date()
                 _date_end = tgt_date - datetime.timedelta(days=365)
+                _date_start = _date_end - datetime.timedelta(days=3650)
                 # print(_date_end.strftime("%m/%d/%Y"))
                 _data_df = c_data_df[c_data_df['Date'] < _date_end.strftime("%m/%d/%Y")]
+                _data_df = _data_df[_data_df['Date'] >= _date_start.strftime("%m/%d/%Y")]
                 fut_cls_df = c_data_df[c_data_df['Date'] >= _date_end.strftime("%m/%d/%Y")].head(250)
 
                 try:
-                    base_vals, sim_vals_dict = project_close_values(_data_df, fut_cls_df, idxname, topN=topN, simulations=1000)
+                    base_vals, sim_vals_dict = project_close_values(_data_df, fut_cls_df, idxname, topN=topN,
+                                                                    simulations=1000)
 
                     for key in sim_vals_dict:
                         line_arr = []
@@ -395,7 +397,7 @@ def test_simulations(idxname, tgt_date, topN=250):
     close_val = r_data_df.iloc[-1]['Close']
 
     cols = r_data_df.columns.values
-    str_format = "{:s} sim={:s}, actual={:s} pred={:s} perc_diff={:f}"
+    str_format = "{:s} {:s} sim={:s}, actual={:s} pred={:s} perc_diff={:f}"
     i = 0
     max_conf = max(confidences)
     sel_cols = []
@@ -406,21 +408,23 @@ def test_simulations(idxname, tgt_date, topN=250):
                 r_data_df.drop([col], axis=1, inplace=True)
             else:
                 sel_cols.extend([col])
-                print(
-                    str_format.format(tgt_date, col, str(Y[i]), str(confidences[i]), (close_val - sim_val) / close_val))
+                # print(str_format.format(idxname, tgt_date, col, str(Y[i]), str(confidences[i]), (close_val - sim_val) / close_val))
             i = i + 1
 
     r_data_df['mean'] = r_data_df[sel_cols].mean(axis=1)
+    sim_val = r_data_df.iloc[-1]['mean']
+    print(str_format.format(idxname, tgt_date, 'mean', str(0), str(max_conf), (close_val - sim_val) / close_val))
+
     r_data_df.to_csv('data/nn_' + test_file, index=False)
     _data_df.to_csv('data/' + test_file, index=False)
 
 
 if __name__ == '__main__':
-    str_dates = ['06/30/2022', '09/30/2021', '03/30/2019', '12/30/2018', '06/30/2017']
+    str_dates = ['09/30/2022', '06/30/2021', '03/30/2020', '12/30/2019', '04/30/2018']
 
     for idxname in INDEX_FILES:
-        prepare_simulation_data(idxname, 1000)
-        mlmodel.build_save_nn(idxname + '_feature')
+        #prepare_simulation_data(idxname, 1000)
+        #mlmodel.build_save_nn(idxname + '_feature')
 
         for strdate in str_dates:
             test_simulations(idxname, strdate, 500)
@@ -437,7 +441,7 @@ if __name__ == "__mai1n__":
     logging.basicConfig(format=format, level=logging.INFO,
                         datefmt="%H:%M:%S")
 
-    str_dates = ['06/30/2022','09/30/2021','03/30/2020','12/30/2019','06/30/2018']
+    str_dates = ['06/30/2022', '09/30/2021', '03/30/2020', '12/30/2019', '06/30/2018']
 
     for tgtdate in str_dates:
         test_simulations('sp500', tgtdate, 250)
