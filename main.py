@@ -258,7 +258,10 @@ def project_close_values(e_data_df, fut_cls_df, idxname, span=250, topN=250, sim
     cls_slope, inter, r_val, p_val, std_err = stats.linregress(range(len(cls_data)), cls_data)
     cls_std = statistics.stdev(cls_data)
 
-    r_data_df['Close'] = np.array(fut_cls_df['Close'])
+    fut_cls_arr = fut_cls_df['Close'].to_numpy()
+    cls_list = r_data_df['Close'].tolist()
+    fut_cls_arr = np.append(fut_cls_arr, cls_list[len(fut_cls_arr):len(cls_list)], 0)
+    r_data_df['Close'] = fut_cls_arr.tolist()
     actual_close = r_data_df.iloc[-1]['Close']
 
     cols = r_data_df.columns.values
@@ -420,7 +423,7 @@ def test_simulations(idxname, tgt_date, topN=250):
 
 
 if __name__ == '__main__':
-    str_dates = ['09/30/2022', '06/30/2021', '03/30/2020', '12/30/2019', '04/30/2018']
+    str_dates = ['12/30/2022']
 
     for idxname in INDEX_FILES:
         #prepare_simulation_data(idxname, 1000)
