@@ -188,6 +188,10 @@ def predict_nn(data_df, idxname):
     X = dataset[:, 0:len(data_df.columns) - 1].astype(float)
     Y = dataset[:, len(data_df.columns) - 1]
 
+    # perform a robust scaler transform of the dataset
+    trans = StandardScaler()
+    X = trans.fit_transform(X)
+
     # load model
     model = load_model(idxname+"_feature_model.h5")
     # summarize model.
@@ -235,6 +239,11 @@ def build_save_nn(filename):
     dataset = data_df.values
     X = dataset[:, 0:(col_len-1)].astype(float)
     Y = dataset[:, col_len-1]
+
+    # perform a robust scaler transform of the dataset
+    trans = StandardScaler()
+    X = trans.fit_transform(X)
+
     print(X.shape)
     print(Y.shape)
     # define model

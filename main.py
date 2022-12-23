@@ -15,9 +15,6 @@ from hurst import compute_Hc
 
 import mlmodel
 import warnings
-import logging
-import threading
-import time
 
 warnings.filterwarnings("ignore")
 
@@ -29,38 +26,8 @@ def load_data(filename):
     return _data_df
 
 
-def run_simuation(simulations, iterations, threshold, value_list, r_data_df, close_val):
-    print(simulations, iterations, threshold)
-    index_value = []
-    for g in range(iterations):
-        sim_results = []
-        '''
-        for sim in range(simulations):
-            random_num = abs(random.choice(value_list))
-            if math.isnan(random_num):
-                random_num = 0
-            sim_results.append(random_num)
-
-        sim_rand_val = abs(np.mean(sim_results))
-        if math.isnan(sim_rand_val):
-            sim_rand_val = abs(np.median(sim_results))
-        '''
-        random_num = abs(random.choice(value_list))
-        number = int(np.random.uniform() * 100)  # get a random number to see who wins
-        if number > threshold:
-            index_value.append(-random_num)
-        else:
-            index_value.append(random_num)
-
-    r_data_df['sim_diff'] = np.array(index_value).tolist()
-    r_data_df['sim_values'] = r_data_df['sim_diff'].cumsum()
-    r_data_df['sim_values'] = r_data_df['sim_values'] + close_val
-
-    return r_data_df
-
-
 def run_simulations(simulations, iterations, threshold, value_list_array, r_data_df, close_val):
-    #print("simulations={:s}, iterations={:s}, threshold={:s}".format(str(simulations), str(iterations), str(threshold)))
+    # print("simulations={:s}, iterations={:s}, threshold={:s}".format(str(simulations), str(iterations), str(threshold)))
     sim_results = []
     mod_denom = len(value_list_array)
     for sim in range(simulations):
@@ -156,12 +123,12 @@ def plot_corr(r_data_df, r1=20, r2=50, plot=False):
 
 def calculate_averages_slope(c_data_df, col_name='Close'):
     _data_df_1y = c_data_df.iloc[-250:]
-    _data_df_1y['SMA20'] = c_data_df['Close'].rolling(20).mean()
-    _data_df_1y['SMA50'] = c_data_df['Close'].rolling(50).mean()
-    _data_df_1y['SMA200'] = c_data_df['Close'].rolling(200).mean()
-    slope, intercept, r_value, p_value, std_err = stats.linregress(range(3), [_data_df_1y.iloc[-1]['SMA20'],
+    _data_df_1y['SMA20'] = c_data_df[col_name].rolling(20).mean()
+    _data_df_1y['SMA50'] = c_data_df[col_name].rolling(50).mean()
+    _data_df_1y['SMA200'] = c_data_df[col_name].rolling(200).mean()
+    slope, intercept, r_value, p_value, std_err = stats.linregress(range(3), [_data_df_1y.iloc[-1]['SMA200'],
                                                                               _data_df_1y.iloc[-1]['SMA50'],
-                                                                              _data_df_1y.iloc[-1]['SMA200']])
+                                                                              _data_df_1y.iloc[-1]['SMA20']])
     return slope
 
 
@@ -181,12 +148,11 @@ def calculate_trends_slope(c_data_df, col_name='Close'):
     slope, intercept, r_value, p_value, std_err = stats.linregress(range(6), [close_val_12m, close_val_9m, close_val_6m,
                                                                               close_val_3m, close_val_1m,
                                                                               cls_val_final])
-
     return slope
 
 
 def project_close_values(e_data_df, fut_cls_df, idxname, span=250, topN=250, simulations=1000):
-    #print("data_df beg={:s}, data_df end={:s}".format(str(e_data_df.iloc[0]['Date']), str(e_data_df.iloc[-1]['Date'])))
+    # print("data_df beg={:s}, data_df end={:s}".format(str(e_data_df.iloc[0]['Date']), str(e_data_df.iloc[-1]['Date'])))
     base_vals = []
     H3, c3, cls_data3, stddev3, slp3 = evaluate_HC(e_data_df, 3, span)
     H5, c5, cls_data5, stddev5, slp5 = evaluate_HC(e_data_df, 5, span)
@@ -240,9 +206,11 @@ def project_close_values(e_data_df, fut_cls_df, idxname, span=250, topN=250, sim
         cls_slp10, intercept, r_value, p_value, std_err = stats.linregress(range(len(cls_data10)), cls_data10)
         sim_vals_list.extend([simH10, cls_stddev10, cls_slp10])
 
-        simHmap[col_name] = np.mean([abs(H3 - simH3), abs(H5 - simH5), abs(H7 - simH7), abs(H10 - simH10),
-                                     abs(slp3 - cls_slp3), abs(slp5 - cls_slp5), abs(slp7 - cls_slp7),
-                                     abs(slp10 - cls_slp10)])
+        h_mean = np.mean([abs(H3 - simH3), abs(H5 - simH5), abs(H7 - simH7), abs(H10 - simH10)])
+        slp_mean = np.mean([abs(slp3 - cls_slp3), abs(slp5 - cls_slp5), abs(slp7 - cls_slp7), abs(slp10 - cls_slp10)])
+        simHmap[col_name] = np.mean([h_mean , slp_mean])
+
+        sim_vals_list.extend([h_mean, slp_mean])
         sim_vals_dict[col_name] = sim_vals_list
 
     simHmap = dict(sorted(simHmap.items(), key=lambda item: item[1]))
@@ -257,6 +225,10 @@ def project_close_values(e_data_df, fut_cls_df, idxname, span=250, topN=250, sim
     cls_data = np.array(prev_close_df['Close']).tolist()
     cls_slope, inter, r_val, p_val, std_err = stats.linregress(range(len(cls_data)), cls_data)
     cls_std = statistics.stdev(cls_data)
+    prev_close_df2 = e_data_df.iloc[-span * 2:].head(span)
+    cls_data2 = np.array(prev_close_df2['Close']).tolist()
+    cls_slope2, inter, r_val, p_val, std_err = stats.linregress(range(len(cls_data2)), cls_data2)
+    cls_std2 = statistics.stdev(cls_data2)
 
     fut_cls_arr = fut_cls_df['Close'].to_numpy()
     cls_list = r_data_df['Close'].tolist()
@@ -267,14 +239,15 @@ def project_close_values(e_data_df, fut_cls_df, idxname, span=250, topN=250, sim
     cols = r_data_df.columns.values
     for col in cols:
         if col not in 'Close':
+
             # print('processing some more features for simulation:'+col)
             sim_data = r_data_df[col].tolist()
             sim_std = statistics.stdev(sim_data)
             cls_sim_slp, inter, r_val, p_val, std_err = stats.linregress(range(len(sim_data)), sim_data)
-            sim_vals_dict[col].extend([cls_slope, cls_sim_slp, cls_std, sim_std])
+            sim_vals_dict[col].extend([cls_slope, cls_slope2, cls_sim_slp, cls_std, cls_std2, sim_std])
+
             strnd_slp = calculate_trends_slope(r_data_df, col)
             sima_slp = calculate_averages_slope(r_data_df, col)
-
             sim_vals_dict[col].extend([strnd_slp, sima_slp])
 
             flag = 0
@@ -308,15 +281,16 @@ BASE_COLS = ['h3', 'h5', 'h7', 'h10', 'std3', 'std5', 'std7', 'std10', 'slp3', '
              'trnd_slp', 'sma_slp', 'thresh']
 
 SIM_COLS = ['val_yr', 'simH3', 'sim_std3', 'sim_slp3', 'simH5', 'sim_std5', 'sim_slp5', 'simH7', 'sim_std7', 'sim_slp7',
-            'simH10', 'sim_std10', 'sim_slp10', 'cls_slope', 'cls_sim_slp', 'cls_std', 'sim_std',
-            'strnd_slp', 'sim_slp', 'flag']
+            'simH10', 'sim_std10', 'sim_slp10', 'h_diff', 'slp_diff', 'cls_slope', 'cls_slope2', 'cls_sim_slp',
+            'cls_std',
+            'cls_std2', 'sim_std', 'strnd_slp', 'sim_slp', 'flag']
 
 # 'corr_20', 'corr_50',
 BASE_COLS.extend(SIM_COLS)
 DATE_VAL = ['03/31', '06/30', '09/30', '12/31']
 
 
-def prepare_simulation_data(idxname, topN=250, years=5):
+def prepare_simulation_data(idxname, tgt_dates, topN=250):
     print(idxname + ' prepare_simulation_data...')
 
     with open('data/' + idxname + '_feature.csv', 'w', newline='') as myfile:
@@ -330,31 +304,28 @@ def prepare_simulation_data(idxname, topN=250, years=5):
         c_data_df['Date'] = pd.to_datetime(c_data_df.Date)
         c_data_df = c_data_df.sort_values('Date')
 
-        for yy in range(years):
-            for mm in DATE_VAL:
-                tgt_date = mm + '/' + str(2017 + yy)
-                print(idxname + ':' + tgt_date)
-                tgt_date = datetime.datetime.strptime(tgt_date, "%m/%d/%Y").date()
-                _date_end = tgt_date - datetime.timedelta(days=365)
-                _date_start = _date_end - datetime.timedelta(days=3650)
-                # print(_date_end.strftime("%m/%d/%Y"))
-                _data_df = c_data_df[c_data_df['Date'] < _date_end.strftime("%m/%d/%Y")]
-                _data_df = _data_df[_data_df['Date'] >= _date_start.strftime("%m/%d/%Y")]
-                fut_cls_df = c_data_df[c_data_df['Date'] >= _date_end.strftime("%m/%d/%Y")].head(250)
+        for tgt_date in tgt_dates:
+            print(idxname + ':' + tgt_date)
+            tgt_date = datetime.datetime.strptime(tgt_date, "%m/%d/%Y").date()
+            _date_end = tgt_date - datetime.timedelta(days=365)
+            _date_start = _date_end - datetime.timedelta(days=3650)
+            # print(_date_end.strftime("%m/%d/%Y"))
+            _data_df = c_data_df[c_data_df['Date'] < _date_end.strftime("%m/%d/%Y")]
+            _data_df = _data_df[_data_df['Date'] >= _date_start.strftime("%m/%d/%Y")]
+            fut_cls_df = c_data_df[c_data_df['Date'] >= _date_end.strftime("%m/%d/%Y")].head(250)
 
-                try:
-                    base_vals, sim_vals_dict = project_close_values(_data_df, fut_cls_df, idxname, topN=topN,
-                                                                    simulations=1000)
+            try:
+                base_vals, sim_vals_dict = project_close_values(_data_df, fut_cls_df, idxname, topN=topN,
+                                                                simulations=1000)
 
-                    for key in sim_vals_dict:
-                        line_arr = []
-                        line_arr.extend(base_vals)
-                        line_arr.extend(sim_vals_dict[key])
-                        wr.writerow(line_arr)
+                for key in sim_vals_dict:
+                    line_arr = []
+                    line_arr.extend(base_vals)
+                    line_arr.extend(sim_vals_dict[key])
+                    wr.writerow(line_arr)
 
-
-                except Exception as e:
-                    print(e)
+            except Exception as e:
+                print(e)
 
         print(idxname + ' features completed')
         myfile.close()
@@ -423,56 +394,15 @@ def test_simulations(idxname, tgt_date, topN=250):
 
 
 if __name__ == '__main__':
-    str_dates = ['10/30/2021']
+
+    tgt_dates = ['12/31/2014', '06/30/2014', '03/31/2015', '09/30/2015', '12/31/2016', '06/30/2016', '03/31/2017',
+                 '09/30/2017', '12/31/2018', '06/30/2018', '03/31/2019', '09/30/2019', '12/31/2020', '06/30/2020',
+                 '03/31/2021', '09/30/2021']
 
     for idxname in INDEX_FILES:
-        #prepare_simulation_data(idxname, 1000)
+        #prepare_simulation_data(idxname, tgt_dates, topN=500)
         #mlmodel.build_save_nn(idxname + '_feature')
 
+        str_dates = ['05/31/2021', '07/30/2022']
         for strdate in str_dates:
             test_simulations(idxname, strdate, 500)
-
-
-def thread_function(name):
-    logging.info("Thread %s: starting", name)
-    time.sleep(2)
-    logging.info("Thread %s: finishing", name)
-
-
-if __name__ == "__mai1n__":
-    format = "%(asctime)s: %(message)s"
-    logging.basicConfig(format=format, level=logging.INFO,
-                        datefmt="%H:%M:%S")
-
-    str_dates = ['06/30/2022', '09/30/2021', '03/30/2020', '12/30/2019', '06/30/2018']
-
-    for tgtdate in str_dates:
-        test_simulations('sp500', tgtdate, 250)
-
-    logging.info("Main    : all done")
-
-    '''
-    r_data_df.set_index('Date', inplace=True)
-    c_data_df.drop(['diff', 'trend'], axis=1, inplace=True)
-
-    plt.plot(r_data_df)
-    plt.plot(c_data_df.tail(span*2))
-    plt.legend(loc='best')
-    plt.show()
-
-    r_data_df.to_csv('data/r_data_df.csv', index=True)        
-            r_data_df.set_index('Date', inplace=True)
-    plt.plot(r_data_df['Close'], label='Close')
-    plt.plot(r_data_df['SMA20'], label='SMA20')
-    plt.plot(r_data_df['SMA50'], label='SMA50')
-    plt.legend(loc=2)
-    plt.show()
-
-    r_data_df.set_index('Date')
-    plt.plot(r_data_df['sim_values'], linestyle='--', color='blue')
-    plt.plot(r_data_df['Close'], linestyle='--', color='black')
-
-    r_data_df.to_csv('data/r_data_df.csv', index=False)
-    # print(r_data_df.iloc[:10].to_string())
-
-    '''
